@@ -520,7 +520,7 @@ function ReviewBlock({
 }
 
 // ---------------------------------------------------------------------------
-// Shared sub-components (preserving original WellnessHub design)
+// Shared sub-components (preserving original design)
 // ---------------------------------------------------------------------------
 function SectionHeading({
   icon,

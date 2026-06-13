@@ -12,8 +12,12 @@ async function sendOtp(email, clientContext) {
   const otpCode = generateOtp();
   const expiresAt = getOtpExpiryDate();
 
+  const patientName = [customer?.first_name, customer?.last_name]
+    .filter(Boolean)
+    .join(' ') || null;
+
   await otpModel.create(email, otpCode, expiresAt);
-  await sendOtpEmail(email, otpCode);
+  await sendOtpEmail(email, otpCode, patientName);
 
   await logAuditEvent({
     eventCode: 'OTP_SENT',

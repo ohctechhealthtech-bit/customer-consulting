@@ -82,23 +82,24 @@ async function sendEmail({ to, subject, text, html }) {
 /**
  * Sends OTP email
  */
-async function sendOtpEmail(to, otpCode) {
-  const subject = 'Your WellnessHub verification code';
-  const text = `Your verification code is ${otpCode}. It expires in 5 minutes. Do not share this code with anyone.`;
+async function sendOtpEmail(to, otpCode, patientName = null) {
+  const greeting = patientName ? `Hello ${patientName},` : 'Hello,';
+  const subject = 'Your OHCTECH Verification Code';
+  const text = `${greeting} Your verification code is ${otpCode}. It expires in 5 minutes. Do not share this code with anyone.`;
   const html = `
     <div style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; max-width: 500px; margin: 0 auto; border: 1px solid #e2e8f0; border-radius: 12px; overflow: hidden;">
       <div style="background-color: #1e3a8a; padding: 24px; text-align: center;">
-        <h1 style="color: #ffffff; margin: 0; font-size: 24px;">WellnessHub Portal</h1>
+        <h1 style="color: #ffffff; margin: 0; font-size: 24px;">OHCTECH Portal</h1>
       </div>
       <div style="padding: 32px; background-color: #ffffff;">
-        <p style="font-size: 16px; color: #475569;">Hello,</p>
+        <p style="font-size: 16px; color: #475569;">${greeting}</p>
         <p style="font-size: 16px; color: #475569;">Your one-time verification code is:</p>
         <div style="background-color: #f8fafc; padding: 24px; text-align: center; border-radius: 8px; margin: 24px 0;">
           <span style="font-size: 36px; font-weight: bold; letter-spacing: 8px; color: #1e3a8a;">${otpCode}</span>
         </div>
         <p style="font-size: 14px; color: #64748b;">This code expires in <strong>5 minutes</strong>. If you did not request this code, please ignore this email.</p>
         <hr style="border: 0; border-top: 1px solid #e2e8f0; margin: 32px 0;" />
-        <p style="font-size: 12px; color: #94a3b8; text-align: center;">&copy; 2026 WellnessHub. All rights reserved.</p>
+        <p style="font-size: 12px; color: #94a3b8; text-align: center;">&copy; 2026 OHCTECH. All rights reserved.</p>
       </div>
     </div>
   `;
@@ -110,25 +111,17 @@ async function sendOtpEmail(to, otpCode) {
  * Sends Consent Confirmation email
  */
 async function sendConsentConfirmationEmail(to, details) {
-  const subject = 'Consent Confirmation - WellnessHub';
-  const text = `Dear customer, your consent for "${details.consentType}" has been successfully recorded. Reference: ${details.referenceNumber}`;
+  const patientName = details.patientName;
+  const greeting = patientName ? `Hello ${patientName},` : 'Hello,';
+  const subject = 'Thank You for Your Response';
+  const text = `${greeting}\n\nThank you for submitting your response successfully.\n\nYour preferences have been recorded.\n\nRegards,\nOHCTECH`;
   const html = `
-    <div style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; max-width: 500px; margin: 0 auto; border: 1px solid #e2e8f0; border-radius: 12px; overflow: hidden;">
-      <div style="background-color: #059669; padding: 24px; text-align: center;">
-        <h1 style="color: #ffffff; margin: 0; font-size: 24px;">Consent Confirmed</h1>
-      </div>
-      <div style="padding: 32px; background-color: #ffffff;">
-        <p style="font-size: 16px; color: #475569;">Hello,</p>
-        <p style="font-size: 16px; color: #475569;">This email confirms that your consent has been successfully recorded:</p>
-        <div style="background-color: #f0fdf4; padding: 20px; border-radius: 8px; margin: 24px 0; border-left: 4px solid #059669;">
-          <p style="margin: 0; font-size: 18px; font-weight: bold; color: #065f46;">${details.consentType}</p>
-          <p style="margin: 8px 0 0 0; font-size: 14px; color: #065f46;">Reference: ${details.referenceNumber}</p>
-          <p style="margin: 4px 0 0 0; font-size: 14px; color: #065f46;">Date: ${new Date().toLocaleDateString()}</p>
-        </div>
-        <p style="font-size: 14px; color: #64748b;">Thank you for contributing to your wellness journey.</p>
-        <hr style="border: 0; border-top: 1px solid #e2e8f0; margin: 32px 0;" />
-        <p style="font-size: 12px; color: #94a3b8; text-align: center;">&copy; 2026 WellnessHub. All rights reserved.</p>
-      </div>
+    <div style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; max-width: 500px; margin: 0 auto; border: 1px solid #e2e8f0; border-radius: 12px; background-color: #ffffff; padding: 40px;">
+      <h2 style="color: #1e3a8a; margin: 0 0 24px 0; font-size: 20px;">Thank You</h2>
+      <p style="font-size: 16px; color: #475569; margin: 0;">${greeting}</p>
+      <p style="font-size: 16px; color: #475569; margin: 24px 0 0 0;">Thank you for submitting your response successfully.</p>
+      <p style="font-size: 16px; color: #475569; margin: 16px 0 0 0;">Your preferences have been recorded.</p>
+      <p style="font-size: 16px; color: #475569; margin: 32px 0 0 0;">Regards,<br /><strong>OHCTECH</strong></p>
     </div>
   `;
 

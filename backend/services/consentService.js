@@ -107,6 +107,7 @@ async function submitConsent(customerId, email, consentChoice, clientContext) {
   // Send confirmation email asynchronously (don't block the response)
   if (consentChoice === 'allow') {
     sendConsentConfirmationEmail(email, {
+      patientName,
       consentType: 'Data Storage and Processing',
       referenceNumber,
     }).catch((err) => console.error('Failed to send consent confirmation email:', err.message));

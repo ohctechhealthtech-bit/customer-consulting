@@ -64,12 +64,12 @@ WHERE question_key IN (
   'additional.comments'
 );
 
--- Default WellnessHub admin (password: Admin@123)
+-- Default OHCTECH admin (password: Admin@123)
 INSERT INTO admin_users (email, password_hash, full_name)
 VALUES (
-  'admin@wellnesshub.com',
-  'wellnesshub_admin_seed:468837d7f090c2bdd6ce3c29fe4cab6e082769fe1b55866a9bcb30d9876dc693d92637b5be22d1f6b824a788267e8f7e9808e83d235a131a43126c8050df9367',
-  'WellnessHub Administrator'
+  'admin@ohctech.com',
+  'ohctech_admin_seed:468837d7f090c2bdd6ce3c29fe4cab6e082769fe1b55866a9bcb30d9876dc693d92637b5be22d1f6b824a788267e8f7e9808e83d235a131a43126c8050df9367',
+  'OHCTECH Administrator'
 )
 ON DUPLICATE KEY UPDATE
   password_hash = VALUES(password_hash),
