@@ -34,12 +34,6 @@ export function PortalShell({ children }: { children: ReactNode }) {
           <Link to="/">
             <BrandMark />
           </Link>
-          <Link
-            to="/admin/login"
-            className="text-[11px] text-muted-foreground underline-offset-2 transition-colors hover:text-foreground hover:underline"
-          >
-            Admin Login
-          </Link>
         </div>
       </header>
       <main className="mx-auto w-full max-w-6xl px-4 py-10 sm:px-6">{children}</main>
