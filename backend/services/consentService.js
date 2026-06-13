@@ -16,9 +16,14 @@ async function submitConsent(customerId, email, consentChoice, clientContext) {
 
   const existing = await consentModel.findByCustomerId(customerId);
   if (existing) {
-    const err = new Error('Consent has already been submitted for this session');
-    err.statusCode = 409;
-    throw err;
+    return {
+      referenceNumber: existing.reference_number,
+      consent: existing.consent_status,
+      consentStatus: existing.consent_status === 'allow' ? 'Allowed' : 'Declined',
+      submittedAt: existing.submitted_at instanceof Date ? existing.submitted_at.toISOString() : existing.submitted_at,
+      dataRetained: existing.consent_status === 'allow',
+      alreadySubmitted: true,
+    };
   }
 
   const referenceNumber = generateReferenceNumber();
@@ -107,7 +112,7 @@ async function submitConsent(customerId, email, consentChoice, clientContext) {
   // Send confirmation email asynchronously (don't block the response)
   if (consentChoice === 'allow') {
     sendConsentConfirmationEmail(email, {
-      patientName,
+      customerName,
       consentType: 'Data Storage and Processing',
       referenceNumber,
     }).catch((err) => console.error('Failed to send consent confirmation email:', err.message));

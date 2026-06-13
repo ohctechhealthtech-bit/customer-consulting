@@ -35,6 +35,7 @@ import {
   logout,
   type Question,
 } from "@/lib/api/portal-api";
+import { getAllCountries, getStatesByCountry, getCitiesByState } from "@/lib/geo-api";
 
 export const Route = createFileRoute("/questionnaire")({
   head: () => ({ meta: [{ title: "Patient Registration — OHCTECH" }] }),
@@ -121,6 +122,7 @@ function buildSectionSchema(questions: Question[]) {
   return z.object(shape);
 }
 
+
 function QuestionnairePage() {
   const navigate = useNavigate();
   const [step, setStep] = useState(0);
@@ -133,8 +135,16 @@ function QuestionnairePage() {
     Record<string, z.ZodObject<z.ZodRawShape>>
   >({});
 
+  const existing = getSession();
+
   // All useForm hooks at the top level — never inside useState/setState/conditions
-  const personalForm = useForm<FormData>({ defaultValues: {} });
+  const personalForm = useForm<FormData>({
+    defaultValues: {
+      personal: {
+        email: existing.email || "",
+      },
+    } as any,
+  });
   const addressForm = useForm<FormData>({ defaultValues: {} });
   const medicalForm = useForm<FormData>({ defaultValues: {} });
   const additionalForm = useForm<FormData>({ defaultValues: {} });
@@ -145,8 +155,6 @@ function QuestionnairePage() {
     medical: medicalForm,
     additional: additionalForm,
   };
-
-  const existing = getSession();
 
   useEffect(() => {
     if (!existing.otpVerified) {
@@ -159,6 +167,24 @@ function QuestionnairePage() {
   async function loadQuestions() {
     try {
       const data = await fetchQuestions();
+      
+      // Reorder address fields: Country, State, City, PIN, Address
+      if (data.sections.address) {
+        const order = [
+          "address.country",
+          "address.state",
+          "address.city",
+          "address.pin",
+          "address.line1",
+        ];
+        data.sections.address.sort((a, b) => {
+          const idxA = order.indexOf(a.questionKey);
+          const idxB = order.indexOf(b.questionKey);
+          if (idxA === -1 || idxB === -1) return 0;
+          return idxA - idxB;
+        });
+      }
+
       const order = Object.keys(data.sections);
       setSections(data.sections);
       setSectionOrder(order);
@@ -358,6 +384,78 @@ function QuestionnairePage() {
 // ---------------------------------------------------------------------------
 // Dynamic section form — rendered from API question definitions
 // ---------------------------------------------------------------------------
+
+function SearchableInput({
+  options,
+  value,
+  onChange,
+  onClearError,
+  placeholder,
+  className,
+  isLoading,
+}: {
+  options: string[];
+  value: string;
+  onChange: (v: string) => void;
+  onClearError?: () => void;
+  placeholder?: string;
+  className?: string;
+  isLoading?: boolean;
+}) {
+  const [isOpen, setIsOpen] = useState(false);
+  const [filter, setFilter] = useState("");
+  
+  const filtered = (options || []).filter((opt) => {
+    const term = (filter || "").toLowerCase();
+    const val = (opt || "").toString().toLowerCase();
+    return val.includes(term);
+  });
+
+  return (
+    <div className="relative">
+      <div className="relative">
+        <Input
+          value={value}
+          onChange={(e) => {
+            onChange(e.target.value);
+            setFilter(e.target.value);
+            setIsOpen(true);
+            onClearError?.();
+          }}
+          onFocus={() => setIsOpen(true)}
+          onBlur={() => setTimeout(() => setIsOpen(false), 200)}
+          placeholder={placeholder}
+          autoComplete="off"
+          className={className}
+        />
+        {isLoading && (
+          <div className="absolute right-3 top-1/2 -translate-y-1/2">
+            <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+          </div>
+        )}
+      </div>
+      {isOpen && !isLoading && filtered.length > 0 && (
+        <div className="absolute z-50 mt-1 max-h-60 w-full overflow-auto rounded-md border border-slate-200 bg-white py-1 shadow-lg">
+          {filtered.map((opt) => (
+            <button
+              key={opt}
+              type="button"
+              className="w-full px-3 py-2 text-left text-sm hover:bg-slate-50 focus:bg-slate-50 focus:outline-none"
+              onClick={() => {
+                onChange(opt);
+                setFilter("");
+                setIsOpen(false);
+              }}
+            >
+              {opt}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function DynamicSectionForm({
   questions,
   form,
@@ -373,94 +471,174 @@ function DynamicSectionForm({
   subtitle?: string;
   onClearError?: (key: string) => void;
 }) {
+  const [allCountries, setAllCountries] = useState<string[]>([]);
+  const [allStates, setAllStates] = useState<string[]>([]);
+  const [allCities, setAllCities] = useState<string[]>([]);
+  const [loadingGeo, setLoadingGeo] = useState({ countries: false, states: false, cities: false });
+
+  const country = form.watch("address.country" as any);
+  const state = form.watch("address.state" as any);
+
+  // Initial load: Countries
+  useEffect(() => {
+    async function init() {
+      setLoadingGeo(prev => ({ ...prev, countries: true }));
+      const list = await getAllCountries();
+      setAllCountries(list);
+      setLoadingGeo(prev => ({ ...prev, countries: false }));
+    }
+    init();
+  }, []);
+
+  // Fetch States when Country changes
+  useEffect(() => {
+    if (!country) {
+      setAllStates([]);
+      return;
+    }
+    async function fetchStates() {
+      setLoadingGeo(prev => ({ ...prev, states: true }));
+      const list = await getStatesByCountry(country);
+      setAllStates(list);
+      setLoadingGeo(prev => ({ ...prev, states: false }));
+    }
+    fetchStates();
+  }, [country]);
+
+  // Fetch Cities when State changes
+  useEffect(() => {
+    if (!country || !state) {
+      setAllCities([]);
+      return;
+    }
+    async function fetchCities() {
+      setLoadingGeo(prev => ({ ...prev, cities: true }));
+      const list = await getCitiesByState(country, state);
+      setAllCities(list);
+      setLoadingGeo(prev => ({ ...prev, cities: false }));
+    }
+    fetchCities();
+  }, [country, state]);
+
   return (
     <Form {...form}>
       <SectionHeading icon={icon} title={title} subtitle={subtitle} />
       <div className="mt-6 grid gap-5 sm:grid-cols-2">
-        {questions.map((q) => (
-          <FormField
-            key={q.id}
-            control={form.control}
-            name={q.questionKey}
-            render={({ field }) => (
-              <FormItem
-                className={
-                  q.fieldType === "textarea" || q.questionKey === "address.line1"
-                    ? "sm:col-span-2"
-                    : ""
-                }
-              >
-                <FieldLabel required={q.isRequired}>{q.label}</FieldLabel>
-                <FormControl>
-                  {q.fieldType === "textarea" ? (
-                    <Textarea
-                      rows={3}
-                      className="rounded-lg"
-                      placeholder={q.placeholder ?? ""}
-                      {...field}
-                      value={String(field.value ?? "")}
-                      onChange={(e) => {
-                        field.onChange(e);
-                        onClearError?.(q.questionKey);
-                      }}
-                    />
-                  ) : q.fieldType === "select" ? (
-                    <Select
-                      onValueChange={(v) => {
-                        field.onChange(v);
-                        onClearError?.(q.questionKey);
-                      }}
-                      value={String(field.value ?? "")}
-                    >
-                      <SelectTrigger className="h-11 rounded-lg">
-                        <SelectValue placeholder={q.placeholder ?? `Select ${q.label.toLowerCase()}`} />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {(q.options ?? []).map((opt) => (
-                          <SelectItem key={opt} value={opt}>
-                            {opt}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  ) : q.fieldType === "phone" ? (
-                    <CountryPhoneInput
-                      value={String(field.value ?? "")}
-                      onChange={(v) => {
-                        field.onChange(v);
-                        onClearError?.(q.questionKey);
-                      }}
-                    />
-                  ) : q.fieldType === "date" ? (
-                    <Input
-                      type="date"
-                      className="h-11 rounded-lg"
-                      {...field}
-                      value={String(field.value ?? "")}
-                      onChange={(e) => {
-                        field.onChange(e);
-                        onClearError?.(q.questionKey);
-                      }}
-                    />
-                  ) : (
-                    <Input
-                      type={q.questionKey === "personal.email" ? "email" : "text"}
-                      className="h-11 rounded-lg"
-                      placeholder={q.placeholder ?? ""}
-                      {...field}
-                      value={String(field.value ?? "")}
-                      onChange={(e) => {
-                        field.onChange(e);
-                        onClearError?.(q.questionKey);
-                      }}
-                    />
-                  )}
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-        ))}
+        {questions.map((q) => {
+          let colSpan = "";
+          if (q.fieldType === "textarea" || q.questionKey === "address.line1") {
+            colSpan = "sm:col-span-2";
+          }
+
+          return (
+            <FormField
+              key={q.id}
+              control={form.control}
+              name={q.questionKey as any}
+              render={({ field }) => (
+                <FormItem className={colSpan}>
+                  <FieldLabel required={q.isRequired}>{q.label}</FieldLabel>
+                  <FormControl>
+                    {q.fieldType === "textarea" ? (
+                      <Textarea
+                        rows={3}
+                        className="rounded-lg"
+                        placeholder={q.placeholder ?? ""}
+                        {...field}
+                        value={String(field.value ?? "")}
+                        onChange={(e) => {
+                          field.onChange(e);
+                          onClearError?.(q.questionKey);
+                        }}
+                      />
+                    ) : q.fieldType === "select" ? (
+                      <Select
+                        onValueChange={(v) => {
+                          field.onChange(v);
+                          onClearError?.(q.questionKey);
+                        }}
+                        value={String(field.value ?? "")}
+                      >
+                        <SelectTrigger className="h-11 rounded-lg">
+                          <SelectValue placeholder={q.placeholder ?? `Select ${q.label.toLowerCase()}`} />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {(q.options ?? []).map((opt) => (
+                            <SelectItem key={opt} value={opt}>
+                              {opt}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    ) : q.questionKey === "address.country" ? (
+                      <SearchableInput
+                        options={allCountries}
+                        isLoading={loadingGeo.countries}
+                        value={String(field.value ?? "")}
+                        onChange={field.onChange}
+                        onClearError={() => onClearError?.(q.questionKey)}
+                        placeholder={q.placeholder ?? ""}
+                        className="h-11 rounded-lg"
+                      />
+                    ) : q.questionKey === "address.state" ? (
+                      <SearchableInput
+                        options={allStates}
+                        isLoading={loadingGeo.states}
+                        value={String(field.value ?? "")}
+                        onChange={field.onChange}
+                        onClearError={() => onClearError?.(q.questionKey)}
+                        placeholder={q.placeholder ?? ""}
+                        className="h-11 rounded-lg"
+                      />
+                    ) : q.questionKey === "address.city" ? (
+                      <SearchableInput
+                        options={allCities}
+                        isLoading={loadingGeo.cities}
+                        value={String(field.value ?? "")}
+                        onChange={field.onChange}
+                        onClearError={() => onClearError?.(q.questionKey)}
+                        placeholder={q.placeholder ?? ""}
+                        className="h-11 rounded-lg"
+                      />
+                    ) : q.fieldType === "phone" ? (
+                      <CountryPhoneInput
+                        value={String(field.value ?? "")}
+                        onChange={(v) => {
+                          field.onChange(v);
+                          onClearError?.(q.questionKey);
+                        }}
+                      />
+                    ) : q.fieldType === "date" ? (
+                      <Input
+                        type="date"
+                        className="h-11 rounded-lg"
+                        {...field}
+                        value={String(field.value ?? "")}
+                        onChange={(e) => {
+                          field.onChange(e);
+                          onClearError?.(q.questionKey);
+                        }}
+                      />
+                    ) : (
+                      <Input
+                        type={q.questionKey === "personal.email" ? "email" : "text"}
+                        className="h-11 rounded-lg"
+                        placeholder={q.placeholder ?? ""}
+                        {...field}
+                        value={String(field.value ?? "")}
+                        onChange={(e) => {
+                          field.onChange(e);
+                          onClearError?.(q.questionKey);
+                        }}
+                      />
+                    )}
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+          );
+        })}
       </div>
     </Form>
   );
@@ -582,9 +760,13 @@ function ReviewSection({
 function ConsentDeclaration({
   consentGranted,
   onConsentChange,
+  onSubmit,
+  submitting,
 }: {
   consentGranted: boolean;
   onConsentChange: (granted: boolean) => void;
+  onSubmit?: () => void;
+  submitting?: boolean;
 }) {
   return (
     <div className="border-t border-slate-200 pt-6">

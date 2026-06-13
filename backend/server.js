@@ -29,6 +29,7 @@ app.use(express.json({ limit: '1mb' }));
 app.use(express.urlencoded({ extended: true }));
 app.use(globalLimiter);
 app.use(attachClientContext);
+app.get('/favicon.ico', (req, res) => res.status(204).end());
 
 app.get('/api/health', async (_req, res) => {
   try {
