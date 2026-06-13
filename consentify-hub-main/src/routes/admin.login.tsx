@@ -131,7 +131,7 @@ function AdminLoginPage() {
                 to="/"
                 className="text-[11px] text-muted-foreground underline-offset-2 hover:text-foreground hover:underline"
               >
-                Back to Customer Portal
+                Back to Patient Portal
               </Link>
             </div>
           </CardContent>

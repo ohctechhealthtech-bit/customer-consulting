@@ -69,7 +69,7 @@ function LoginPage() {
             <div className="flex flex-col items-center text-center">
               <BrandLogo size="lg" />
               <p className="mt-5 text-sm text-muted-foreground font-medium">
-                Customer Consent & Data Collection Portal
+                Patient Consent & Data Collection Portal
               </p>
             </div>
 

@@ -51,7 +51,7 @@ type CustomerDetail = {
 };
 
 export const Route = createFileRoute("/admin/customers")({
-  head: () => ({ meta: [{ title: "Customers — Admin Console" }] }),
+  head: () => ({ meta: [{ title: "Patients — Admin Console" }] }),
   component: CustomersPage,
 });
 
@@ -107,7 +107,7 @@ function CustomersPage() {
       );
       setData(result);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to load customers");
+      setError(err instanceof Error ? err.message : "Failed to load patients");
     } finally {
       setLoading(false);
     }
@@ -146,14 +146,14 @@ function CustomersPage() {
       );
       setDetail(data);
     } catch (err) {
-      setDetailError(err instanceof Error ? err.message : "Failed to load customer detail");
+      setDetailError(err instanceof Error ? err.message : "Failed to load patient detail");
     } finally {
       setDetailLoading(false);
     }
   };
 
   return (
-    <AdminLayout title="Customers">
+    <AdminLayout title="Patients">
       <div className="rounded-xl border border-slate-200 bg-white shadow-sm">
         <div className="flex flex-wrap items-center gap-3 border-b border-slate-200 p-4">
           <div className="relative min-w-0 flex-1">
@@ -189,7 +189,7 @@ function CustomersPage() {
         <div className="overflow-x-auto">
           {loading ? (
             <div className="py-16 text-center text-sm text-muted-foreground">
-              Loading customers…
+              Loading patients…
             </div>
           ) : error ? (
             <div className="py-16 text-center text-sm text-red-500">{error}</div>
@@ -231,7 +231,7 @@ function CustomersPage() {
                 {customers.length === 0 && (
                   <TableRow>
                     <TableCell colSpan={7} className="py-10 text-center text-sm text-muted-foreground">
-                      No customers match your filters.
+                      No patients match your filters.
                     </TableCell>
                   </TableRow>
                 )}
@@ -274,7 +274,7 @@ function CustomersPage() {
             <DialogDescription className="font-mono text-xs">{view?.reference}</DialogDescription>
           </DialogHeader>
           {detailLoading ? (
-            <div className="py-8 text-center text-sm text-muted-foreground">Loading customer detail…</div>
+            <div className="py-8 text-center text-sm text-muted-foreground">Loading patient detail…</div>
           ) : detailError ? (
             <div className="py-8 text-center text-sm text-red-500">{detailError}</div>
           ) : view && view.consent === "Rejected" ? (

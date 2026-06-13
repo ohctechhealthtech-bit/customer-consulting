@@ -44,7 +44,7 @@ export function PortalShell({ children }: { children: ReactNode }) {
       </header>
       <main className="mx-auto w-full max-w-6xl px-4 py-10 sm:px-6">{children}</main>
       <footer className="py-6 text-center text-xs text-muted-foreground">
-        © {new Date().getFullYear()} OHCTECH · Customer Consent &amp; Data Collection
+        © {new Date().getFullYear()} OHCTECH · Patient Consent & Data Collection
       </footer>
     </div>
   );

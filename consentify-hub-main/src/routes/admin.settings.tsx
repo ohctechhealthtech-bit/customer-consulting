@@ -27,7 +27,7 @@ function SettingsPage() {
           <Toggle label="Enforce 2FA for admins" defaultChecked />
           <Field label="OTP validity (seconds)" defaultValue="60" type="number" />
         </Section>
-        <Section title="Consent text" desc="Shown on the customer consent page.">
+        <Section title="Consent text" desc="Shown on the patient consent page.">
           <Label>Default consent statement</Label>
           <Textarea
             rows={6}

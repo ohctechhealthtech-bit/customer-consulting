@@ -119,7 +119,7 @@ function DashboardPage() {
   return (
     <AdminLayout title="Dashboard">
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
-        <StatCard label="Total customers" value={summary.totalCustomers.toLocaleString()} icon={Users} />
+        <StatCard label="Total patients" value={summary.totalCustomers.toLocaleString()} icon={Users} />
         <StatCard label="Today's logins" value={summary.todaysLogins.toLocaleString()} icon={LogIn} />
         <StatCard
           label="Total submissions"
@@ -220,7 +220,7 @@ function DashboardPage() {
       </div>
 
       <div className="mt-4 grid gap-4 lg:grid-cols-2">
-        <Panel title="Recent customers">
+        <Panel title="Recent patients">
           <Table>
             <TableHeader>
               <TableRow>
@@ -244,7 +244,7 @@ function DashboardPage() {
               {recentCustomers.length === 0 && (
                 <TableRow>
                   <TableCell colSpan={3} className="py-8 text-center text-sm text-muted-foreground">
-                    No recent customers
+                    No recent patients
                   </TableCell>
                 </TableRow>
               )}

@@ -31,7 +31,7 @@ import { getAdminInitials, getAdminSession } from "@/lib/admin-store";
 
 const nav = [
   { title: "Dashboard", url: "/admin", icon: LayoutDashboard, exact: true },
-  { title: "Customers", url: "/admin/customers", icon: Users },
+  { title: "Patients", url: "/admin/customers", icon: Users },
   { title: "Responses", url: "/admin/responses", icon: ClipboardList },
   { title: "Consent Reports", url: "/admin/consent-reports", icon: ClipboardCheck },
   { title: "Login History", url: "/admin/logins", icon: LogIn },
@@ -61,7 +61,7 @@ export function AdminLayout({ title, children }: { title: string; children: Reac
             </div>
             <div className="ml-auto flex items-center gap-3">
               <Link to="/" className="text-xs font-medium text-muted-foreground hover:text-foreground">
-                View customer portal
+                View patient portal
               </Link>
               <div className="hidden text-xs text-muted-foreground sm:block">{adminEmail}</div>
               <div className="grid h-8 w-8 place-items-center rounded-full bg-primary text-xs font-semibold text-primary-foreground">
