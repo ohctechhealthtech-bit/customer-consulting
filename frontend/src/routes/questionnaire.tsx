@@ -284,19 +284,19 @@ function QuestionnairePage() {
       const consentChoice: "allow" | "deny" = consentGranted ? "allow" : "deny";
       const consentResult = await submitConsent(consentChoice, token);
 
+      // Persist result for thank-you page IMMEDIATELY after receiving it
+      setSession({
+        consent: consentChoice,
+        referenceNumber: consentResult.referenceNumber,
+        submittedAt: consentResult.submittedAt,
+      });
+
       // Logout (fire-and-forget)
       try {
         await logout(token);
       } catch {
         // silently ignore
       }
-
-      // Persist result for thank-you page
-      setSession({
-        consent: consentChoice,
-        referenceNumber: consentResult.referenceNumber,
-        submittedAt: consentResult.submittedAt,
-      });
 
       navigate({ to: "/processing" });
     } catch (err) {
