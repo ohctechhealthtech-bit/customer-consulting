@@ -208,6 +208,7 @@ const customerModel = {
        FROM customer_master cm
        INNER JOIN customer_consent cc ON cc.customer_id = cm.id
        WHERE cm.id = :customerId
+       ORDER BY cc.submitted_at DESC
        LIMIT 1`,
       { customerId },
     );

@@ -14,17 +14,8 @@ async function submitConsent(customerId, email, consentChoice, clientContext) {
     throw err;
   }
 
-  const existing = await consentModel.findByCustomerId(customerId);
-  if (existing) {
-    return {
-      referenceNumber: existing.reference_number,
-      consent: existing.consent_status,
-      consentStatus: existing.consent_status === 'allow' ? 'Allowed' : 'Declined',
-      submittedAt: existing.submitted_at instanceof Date ? existing.submitted_at.toISOString() : existing.submitted_at,
-      dataRetained: existing.consent_status === 'allow',
-      alreadySubmitted: true,
-    };
-  }
+  // Every submission creates a new consent record (history), so we no longer return early
+  // if an existing one is found for this customer.
 
   const referenceNumber = generateReferenceNumber();
   const submittedAt = new Date();

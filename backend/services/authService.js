@@ -17,15 +17,19 @@ async function sendOtp(email, clientContext) {
     .join(' ') || null;
 
   await otpModel.create(email, otpCode, expiresAt);
-  await sendOtpEmail(email, otpCode, patientName);
 
-  await logAuditEvent({
+  // Send email and log audit event in background to minimize response time
+  sendOtpEmail(email, otpCode, patientName).catch((err) =>
+    console.error(`[Background Email Error] ${err.message}`),
+  );
+
+  logAuditEvent({
     eventCode: 'OTP_SENT',
     userIdentifier: email,
     customerId: customer.id,
     description: `OTP sent to ${email}`,
     ...clientContext,
-  });
+  }).catch((err) => console.error(`[Background Audit Error] ${err.message}`));
 
   return {
     email,
