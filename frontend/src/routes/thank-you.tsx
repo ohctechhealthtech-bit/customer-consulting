@@ -1,6 +1,6 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { CheckCircle2, Download, Home } from "lucide-react";
+import { CheckCircle2, Home } from "lucide-react";
 import { toast } from "sonner";
 
 import { Card, CardContent } from "@/components/ui/card";
@@ -26,16 +26,6 @@ function ThankYouPage() {
     setS(s);
   }, [navigate]);
 
-  const download = () => {
-    const blob = new Blob([JSON.stringify(session, null, 2)], { type: "application/json" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `${session.referenceNumber}.json`;
-    a.click();
-    URL.revokeObjectURL(url);
-    toast.success("Confirmation downloaded");
-  };
 
   const goHome = () => {
     clearSession();
@@ -99,9 +89,6 @@ function ThankYouPage() {
             </div>
 
             <div className="mt-7 flex flex-col gap-3 sm:flex-row sm:justify-center">
-              <BrandButton variant="outline" onClick={download}>
-                <Download className="h-4 w-4" /> Download Confirmation
-              </BrandButton>
               <BrandButton onClick={goHome}>
                 <Home className="h-4 w-4" /> Return Home
               </BrandButton>
