@@ -51,9 +51,17 @@ function OtpPage() {
         token: result.token,
         customerId: result.customerId,
         loginHistoryId: result.loginHistoryId,
+        mustChangePassword: !!result.customer?.mustChangePassword,
       });
       toast.success("Email verified");
-      navigate({ to: "/questionnaire" });
+      
+      if (result.customer?.mustChangePassword) {
+        navigate({ to: "/change-password" });
+      } else if (result.customer?.registered) {
+        navigate({ to: "/dashboard" });
+      } else {
+        navigate({ to: "/questionnaire" });
+      }
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Verification failed");
     } finally {

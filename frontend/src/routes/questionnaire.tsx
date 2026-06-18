@@ -3,7 +3,7 @@ import { useEffect, useState, useCallback, type ReactNode } from "react";
 import { useForm, type UseFormReturn } from "react-hook-form";
 import { z } from "zod";
 import { toast } from "sonner";
-import { ClipboardList, HeartPulse, MapPin, User, Loader2 } from "lucide-react";
+import { ClipboardList, User, Loader2, ShieldCheck } from "lucide-react";
 
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -35,7 +35,6 @@ import {
   logout,
   type Question,
 } from "@/lib/api/portal-api";
-import { getAllCountries, getStatesByCountry, getCitiesByState } from "@/lib/geo-api";
 
 export const Route = createFileRoute("/questionnaire")({
   head: () => ({ meta: [{ title: "Patient Registration — OHCTECH" }] }),
@@ -44,24 +43,21 @@ export const Route = createFileRoute("/questionnaire")({
 
 const SECTION_ICONS: Record<string, ReactNode> = {
   personal: <User className="h-4 w-4" />,
-  address: <MapPin className="h-4 w-4" />,
-  medical: <HeartPulse className="h-4 w-4" />,
-  additional: <ClipboardList className="h-4 w-4" />,
 };
 
 const SECTION_TITLES: Record<string, string> = {
   personal: "Personal Details",
-  address: "Address Details",
-  medical: "Medical Information",
-  additional: "Additional Information",
+  policy: "Data Policy",
 };
 
 const SECTION_SUBTITLES: Record<string, string> = {
   personal: "Please provide your personal information for patient registration.",
-  address: "Provide your residential address for correspondence and records.",
-  medical: "Share relevant medical history to support your care.",
-  additional: "Help us communicate with you effectively.",
+  policy: "Please review our data privacy and processing policies.",
 };
+
+const DATA_PRIVACY_POLICY = `We take your privacy seriously. Your personal information is collected only for clinical registration, care coordination, and authorized communication. We implement industry-standard encryption and security protocols to protect your data from unauthorized access. Your information will never be shared with third parties without your explicit consent, except where required by law.`;
+
+const DATA_PROCESSING_POLICY = `By using our platform, you consent to the processing of your data for the purpose of maintaining accurate medical records and facilitating healthcare services. Processing includes storage, retrieval, and internal analysis by authorized healthcare professionals. We retain your data only for as long as necessary to provide care and comply with regulatory retention periods.`;
 
 const CONSENT_LABEL =
   "I consent to the collection, processing, storage, and use of my information for healthcare and administrative purposes.";
@@ -98,7 +94,19 @@ function buildSectionSchema(questions: Question[]) {
         .string()
         .trim()
         .min(q.isRequired ? 7 : 0, q.isRequired ? "Required" : "")
-        .max(24, "Number is too long");
+        .max(24, "Number is too long")
+        .superRefine((val, ctx) => {
+          if (!val) return;
+          if (val.startsWith("+91")) {
+            const digits = val.replace(/\D/g, "").slice(2); // remove 91
+            if (digits.length !== 10) {
+              ctx.addIssue({
+                code: z.ZodIssueCode.custom,
+                message: "Indian mobile numbers must be exactly 10 digits",
+              });
+            }
+          }
+        });
       if (!q.isRequired) field = field.optional().or(z.literal(""));
     } else if (q.questionKey === "personal.email") {
       field = z.string().trim().email("Enter a valid email").max(255);
@@ -145,15 +153,9 @@ function QuestionnairePage() {
       },
     } as any,
   });
-  const addressForm = useForm<FormData>({ defaultValues: {} });
-  const medicalForm = useForm<FormData>({ defaultValues: {} });
-  const additionalForm = useForm<FormData>({ defaultValues: {} });
 
   const formMap: Record<string, UseFormReturn<FormData>> = {
     personal: personalForm,
-    address: addressForm,
-    medical: medicalForm,
-    additional: additionalForm,
   };
 
   useEffect(() => {
@@ -168,25 +170,19 @@ function QuestionnairePage() {
     try {
       const data = await fetchQuestions();
       
-      // Reorder address fields: Country, State, City, PIN, Address
-      if (data.sections.address) {
-        const order = [
-          "address.country",
-          "address.state",
-          "address.city",
-          "address.pin",
-          "address.line1",
-        ];
-        data.sections.address.sort((a, b) => {
-          const idxA = order.indexOf(a.questionKey);
-          const idxB = order.indexOf(b.questionKey);
-          if (idxA === -1 || idxB === -1) return 0;
-          return idxA - idxB;
-        });
+      // Keep only specific sections
+      const keptSections = ["personal"];
+      const filteredSections: Record<string, Question[]> = {};
+      const order: string[] = [];
+
+      for (const k of keptSections) {
+        if (data.sections[k]) {
+          filteredSections[k] = data.sections[k];
+          order.push(k);
+        }
       }
 
-      const order = Object.keys(data.sections);
-      setSections(data.sections);
+      setSections(filteredSections);
       setSectionOrder(order);
 
       const schemas: Record<string, z.ZodObject<z.ZodRawShape>> = {};
@@ -202,7 +198,11 @@ function QuestionnairePage() {
   }
 
   const steps = sectionOrder.map((s) => SECTION_TITLES[s] || s);
-  const fullSteps = [...steps, "Review"];
+  const fullSteps = [...steps, "Data Policy", "Review"];
+
+  const currentSec = sectionOrder[step];
+  const isPolicyStep = step === fullSteps.length - 2;
+  const isReviewStep = step === fullSteps.length - 1;
 
   const validateSection = useCallback(
     async (sec: string): Promise<boolean> => {
@@ -281,12 +281,12 @@ function QuestionnairePage() {
       await submitQuestionnaire(responses, token);
 
       // Submit consent
-      const consentChoice: "allow" | "deny" = consentGranted ? "allow" : "deny";
-      const consentResult = await submitConsent(consentChoice, token);
+      const action = consentGranted ? "ACCEPT" : "REJECT";
+      const consentResult = await submitConsent(action, token);
 
       // Persist result for thank-you page IMMEDIATELY after receiving it
       setSession({
-        consent: consentChoice,
+        consent: action === "ACCEPT" ? "allow" : "deny",
         referenceNumber: consentResult.referenceNumber,
         submittedAt: consentResult.submittedAt,
       });
@@ -324,9 +324,6 @@ function QuestionnairePage() {
     );
   }
 
-  const currentSec = sectionOrder[step];
-  const isReviewStep = step === fullSteps.length - 1;
-
   return (
     <PortalShell>
       <div className="mx-auto max-w-3xl">
@@ -335,7 +332,7 @@ function QuestionnairePage() {
         </div>
         <Card className="rounded-2xl border-slate-200 shadow-sm">
           <CardContent className="p-6 sm:p-8">
-            {!isReviewStep && currentSec && (
+            {!isPolicyStep && !isReviewStep && currentSec && (
               <DynamicSectionForm
                 questions={sections[currentSec] ?? []}
                 form={formMap[currentSec]}
@@ -346,19 +343,35 @@ function QuestionnairePage() {
               />
             )}
 
+            {isPolicyStep && (
+              <DataPolicyBlock
+                onAccept={next}
+                onReject={async () => {
+                  const token = getPortalToken();
+                  if (token) {
+                    try {
+                      await submitConsent("REJECT", token);
+                    } catch (e) {
+                      console.error("Failed to submit rejection", e);
+                    }
+                  }
+                  toast.error("Consent rejected. Your data has not been saved.");
+                  logout(token || "").then(() => navigate({ to: "/" }));
+                }}
+              />
+            )}
+
             {isReviewStep && (
               <ReviewBlock
                 sections={sections}
                 sectionOrder={sectionOrder}
                 formMap={formMap}
-                consentGranted={consentGranted}
-                onConsentChange={setConsentGranted}
                 onSubmit={handleSubmit}
                 submitting={submitting}
               />
             )}
 
-            {!isReviewStep && step < fullSteps.length - 1 && (
+            {!isPolicyStep && !isReviewStep && step < fullSteps.length - 1 && (
               <div className="mt-8 flex flex-col-reverse justify-between gap-3 sm:flex-row">
                 <BrandButton variant="outline" onClick={prev} disabled={step === 0}>
                   Previous
@@ -367,7 +380,7 @@ function QuestionnairePage() {
               </div>
             )}
 
-            {isReviewStep && (
+            {(isPolicyStep || isReviewStep) && (
               <div className="mt-6">
                 <BrandButton variant="outline" onClick={prev}>
                   Previous
@@ -385,77 +398,6 @@ function QuestionnairePage() {
 // Dynamic section form — rendered from API question definitions
 // ---------------------------------------------------------------------------
 
-function SearchableInput({
-  options,
-  value,
-  onChange,
-  onClearError,
-  placeholder,
-  className,
-  isLoading,
-}: {
-  options: string[];
-  value: string;
-  onChange: (v: string) => void;
-  onClearError?: () => void;
-  placeholder?: string;
-  className?: string;
-  isLoading?: boolean;
-}) {
-  const [isOpen, setIsOpen] = useState(false);
-  const [filter, setFilter] = useState("");
-  
-  const filtered = (options || []).filter((opt) => {
-    const term = (filter || "").toLowerCase();
-    const val = (opt || "").toString().toLowerCase();
-    return val.includes(term);
-  });
-
-  return (
-    <div className="relative">
-      <div className="relative">
-        <Input
-          value={value}
-          onChange={(e) => {
-            onChange(e.target.value);
-            setFilter(e.target.value);
-            setIsOpen(true);
-            onClearError?.();
-          }}
-          onFocus={() => setIsOpen(true)}
-          onBlur={() => setTimeout(() => setIsOpen(false), 200)}
-          placeholder={placeholder}
-          autoComplete="off"
-          className={className}
-        />
-        {isLoading && (
-          <div className="absolute right-3 top-1/2 -translate-y-1/2">
-            <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
-          </div>
-        )}
-      </div>
-      {isOpen && !isLoading && filtered.length > 0 && (
-        <div className="absolute z-50 mt-1 max-h-60 w-full overflow-auto rounded-md border border-slate-200 bg-white py-1 shadow-lg">
-          {filtered.map((opt) => (
-            <button
-              key={opt}
-              type="button"
-              className="w-full px-3 py-2 text-left text-sm hover:bg-slate-50 focus:bg-slate-50 focus:outline-none"
-              onClick={() => {
-                onChange(opt);
-                setFilter("");
-                setIsOpen(false);
-              }}
-            >
-              {opt}
-            </button>
-          ))}
-        </div>
-      )}
-    </div>
-  );
-}
-
 function DynamicSectionForm({
   questions,
   form,
@@ -471,62 +413,13 @@ function DynamicSectionForm({
   subtitle?: string;
   onClearError?: (key: string) => void;
 }) {
-  const [allCountries, setAllCountries] = useState<string[]>([]);
-  const [allStates, setAllStates] = useState<string[]>([]);
-  const [allCities, setAllCities] = useState<string[]>([]);
-  const [loadingGeo, setLoadingGeo] = useState({ countries: false, states: false, cities: false });
-
-  const country = form.watch("address.country" as any);
-  const state = form.watch("address.state" as any);
-
-  // Initial load: Countries
-  useEffect(() => {
-    async function init() {
-      setLoadingGeo(prev => ({ ...prev, countries: true }));
-      const list = await getAllCountries();
-      setAllCountries(list);
-      setLoadingGeo(prev => ({ ...prev, countries: false }));
-    }
-    init();
-  }, []);
-
-  // Fetch States when Country changes
-  useEffect(() => {
-    if (!country) {
-      setAllStates([]);
-      return;
-    }
-    async function fetchStates() {
-      setLoadingGeo(prev => ({ ...prev, states: true }));
-      const list = await getStatesByCountry(country);
-      setAllStates(list);
-      setLoadingGeo(prev => ({ ...prev, states: false }));
-    }
-    fetchStates();
-  }, [country]);
-
-  // Fetch Cities when State changes
-  useEffect(() => {
-    if (!country || !state) {
-      setAllCities([]);
-      return;
-    }
-    async function fetchCities() {
-      setLoadingGeo(prev => ({ ...prev, cities: true }));
-      const list = await getCitiesByState(country, state);
-      setAllCities(list);
-      setLoadingGeo(prev => ({ ...prev, cities: false }));
-    }
-    fetchCities();
-  }, [country, state]);
-
   return (
     <Form {...form}>
       <SectionHeading icon={icon} title={title} subtitle={subtitle} />
       <div className="mt-6 grid gap-5 sm:grid-cols-2">
         {questions.map((q) => {
           let colSpan = "";
-          if (q.fieldType === "textarea" || q.questionKey === "address.line1") {
+          if (q.fieldType === "textarea") {
             colSpan = "sm:col-span-2";
           }
 
@@ -570,36 +463,6 @@ function DynamicSectionForm({
                           ))}
                         </SelectContent>
                       </Select>
-                    ) : q.questionKey === "address.country" ? (
-                      <SearchableInput
-                        options={allCountries}
-                        isLoading={loadingGeo.countries}
-                        value={String(field.value ?? "")}
-                        onChange={field.onChange}
-                        onClearError={() => onClearError?.(q.questionKey)}
-                        placeholder={q.placeholder ?? ""}
-                        className="h-11 rounded-lg"
-                      />
-                    ) : q.questionKey === "address.state" ? (
-                      <SearchableInput
-                        options={allStates}
-                        isLoading={loadingGeo.states}
-                        value={String(field.value ?? "")}
-                        onChange={field.onChange}
-                        onClearError={() => onClearError?.(q.questionKey)}
-                        placeholder={q.placeholder ?? ""}
-                        className="h-11 rounded-lg"
-                      />
-                    ) : q.questionKey === "address.city" ? (
-                      <SearchableInput
-                        options={allCities}
-                        isLoading={loadingGeo.cities}
-                        value={String(field.value ?? "")}
-                        onChange={field.onChange}
-                        onClearError={() => onClearError?.(q.questionKey)}
-                        placeholder={q.placeholder ?? ""}
-                        className="h-11 rounded-lg"
-                      />
                     ) : q.fieldType === "phone" ? (
                       <CountryPhoneInput
                         value={String(field.value ?? "")}
@@ -645,22 +508,58 @@ function DynamicSectionForm({
 }
 
 // ---------------------------------------------------------------------------
+// Data Policy block
+// ---------------------------------------------------------------------------
+function DataPolicyBlock({ onAccept, onReject }: { onAccept: () => void; onReject: () => void }) {
+  return (
+    <div className="space-y-6">
+      <SectionHeading
+        icon={<ShieldCheck className="h-4 w-4" />}
+        title={SECTION_TITLES.policy}
+        subtitle={SECTION_SUBTITLES.policy}
+      />
+
+      <div className="space-y-6 rounded-xl border border-slate-200 bg-slate-50/50 p-6">
+        <div>
+          <h3 className="text-sm font-bold text-foreground">Data Privacy Policy</h3>
+          <p className="mt-2 text-sm leading-relaxed text-muted-foreground">{DATA_PRIVACY_POLICY}</p>
+        </div>
+
+        <div className="border-t border-slate-200 pt-6">
+          <h3 className="text-sm font-bold text-foreground">Data Processing Policy</h3>
+          <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
+            {DATA_PROCESSING_POLICY}
+          </p>
+        </div>
+      </div>
+
+      <div className="flex flex-col gap-3 sm:flex-row sm:justify-end">
+        <BrandButton
+          variant="outline"
+          onClick={onReject}
+          className="border-red-200 text-red-600 hover:bg-red-50 hover:text-red-700"
+        >
+          Reject
+        </BrandButton>
+        <BrandButton onClick={onAccept}>Accept & Continue</BrandButton>
+      </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Review block
 // ---------------------------------------------------------------------------
 function ReviewBlock({
   sections,
   sectionOrder,
   formMap,
-  consentGranted,
-  onConsentChange,
   onSubmit,
   submitting,
 }: {
   sections: Record<string, Question[]>;
   sectionOrder: string[];
   formMap: Record<string, UseFormReturn<FormData>>;
-  consentGranted: boolean;
-  onConsentChange: (granted: boolean) => void;
   onSubmit: () => void;
   submitting: boolean;
 }) {
@@ -684,8 +583,6 @@ function ReviewBlock({
             <ReviewSection key={sec} title={SECTION_TITLES[sec] || sec} rows={rows} />
           );
         })}
-
-        <ConsentDeclaration consentGranted={consentGranted} onConsentChange={onConsentChange} />
       </div>
 
       <div className="mt-6 flex justify-end border-t border-slate-200 pt-6">

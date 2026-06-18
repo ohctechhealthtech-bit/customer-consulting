@@ -23,7 +23,7 @@ import { Button } from "@/components/ui/button";
 import { adminFetch } from "@/lib/admin-api";
 
 export const Route = createFileRoute("/admin/consent-reports")({
-  head: () => ({ meta: [{ title: "Consent Reports — Admin Console" }] }),
+  head: () => ({ meta: [{ title: "Consent Reports — Login Console" }] }),
   component: ConsentReportsPage,
 });
 

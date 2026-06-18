@@ -1,14 +1,12 @@
 const questionModel = require('../models/questionModel');
 const responseModel = require('../models/responseModel');
 const customerModel = require('../models/customerModel');
+const companyModel = require('../models/companyModel');
 const { logAuditEvent } = require('./auditService');
 
 function groupQuestionsBySection(questions) {
   const sections = {
     personal: [],
-    address: [],
-    medical: [],
-    additional: [],
   };
 
   for (const question of questions) {
@@ -71,13 +69,21 @@ async function submitQuestionnaire(customerId, email, responses, clientContext) 
   await responseModel.upsertMany(customerId, normalized);
 
   const personalFields = {};
+  let companyName = null;
+
   for (const item of normalized) {
     const question = questionMap.get(item.questionId);
     if (!question) continue;
     if (question.questionKey === 'personal.firstName') personalFields.firstName = item.value;
     if (question.questionKey === 'personal.lastName') personalFields.lastName = item.value;
     if (question.questionKey === 'personal.mobile') personalFields.mobile = item.value;
-    if (question.questionKey === 'personal.dob') personalFields.dob = item.value;
+    if (question.questionKey === 'personal.age') personalFields.age = item.value;
+    if (question.questionKey === 'personal.companyName') companyName = item.value;
+    if (question.questionKey === 'personal.employeeCode') personalFields.employeeCode = item.value;
+  }
+
+  if (companyName) {
+    personalFields.companyId = await companyModel.findOrCreateByName(companyName);
   }
 
   if (Object.keys(personalFields).length > 0) {

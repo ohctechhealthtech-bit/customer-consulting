@@ -45,7 +45,7 @@ export function AdminLayout({ title, children }: { title: string; children: Reac
 
   const handleLogout = () => {
     adminLogout();
-    navigate({ to: "/admin/login" });
+    navigate({ to: "/" });
   };
 
   return (
@@ -57,7 +57,7 @@ export function AdminLayout({ title, children }: { title: string; children: Reac
             <SidebarTrigger />
             <div className="min-w-0">
               <div className="truncate text-sm font-semibold text-foreground">{title}</div>
-              <div className="text-[11px] text-muted-foreground">Admin Console</div>
+              <div className="text-[11px] text-muted-foreground">Login Console</div>
             </div>
             <div className="ml-auto flex items-center gap-3">
               <Link to="/" className="text-xs font-medium text-muted-foreground hover:text-foreground">
@@ -96,7 +96,7 @@ function AdminSidebar() {
           />
           <div className="min-w-0 leading-tight group-data-[collapsible=icon]:hidden border-l border-slate-200 pl-2 ml-1">
             <div className="truncate text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground">
-              Admin Console
+              Login Console
             </div>
           </div>
         </div>

@@ -13,14 +13,16 @@ import { Route as ThankYouRouteImport } from './routes/thank-you'
 import { Route as QuestionnaireRouteImport } from './routes/questionnaire'
 import { Route as ProcessingRouteImport } from './routes/processing'
 import { Route as OtpRouteImport } from './routes/otp'
+import { Route as HistoryRouteImport } from './routes/history'
+import { Route as DashboardRouteImport } from './routes/dashboard'
 import { Route as ConsentRouteImport } from './routes/consent'
+import { Route as ChangePasswordRouteImport } from './routes/change-password'
 import { Route as AdminRouteImport } from './routes/admin'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AdminIndexRouteImport } from './routes/admin.index'
 import { Route as AdminSettingsRouteImport } from './routes/admin.settings'
 import { Route as AdminResponsesRouteImport } from './routes/admin.responses'
 import { Route as AdminLoginsRouteImport } from './routes/admin.logins'
-import { Route as AdminLoginRouteImport } from './routes/admin.login'
 import { Route as AdminDashboardRouteImport } from './routes/admin.dashboard'
 import { Route as AdminCustomersRouteImport } from './routes/admin.customers'
 import { Route as AdminConsentReportsRouteImport } from './routes/admin.consent-reports'
@@ -46,9 +48,24 @@ const OtpRoute = OtpRouteImport.update({
   path: '/otp',
   getParentRoute: () => rootRouteImport,
 } as any)
+const HistoryRoute = HistoryRouteImport.update({
+  id: '/history',
+  path: '/history',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const DashboardRoute = DashboardRouteImport.update({
+  id: '/dashboard',
+  path: '/dashboard',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ConsentRoute = ConsentRouteImport.update({
   id: '/consent',
   path: '/consent',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ChangePasswordRoute = ChangePasswordRouteImport.update({
+  id: '/change-password',
+  path: '/change-password',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AdminRoute = AdminRouteImport.update({
@@ -81,11 +98,6 @@ const AdminLoginsRoute = AdminLoginsRouteImport.update({
   path: '/logins',
   getParentRoute: () => AdminRoute,
 } as any)
-const AdminLoginRoute = AdminLoginRouteImport.update({
-  id: '/login',
-  path: '/login',
-  getParentRoute: () => AdminRoute,
-} as any)
 const AdminDashboardRoute = AdminDashboardRouteImport.update({
   id: '/dashboard',
   path: '/dashboard',
@@ -110,7 +122,10 @@ const AdminAuditRoute = AdminAuditRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/admin': typeof AdminRouteWithChildren
+  '/change-password': typeof ChangePasswordRoute
   '/consent': typeof ConsentRoute
+  '/dashboard': typeof DashboardRoute
+  '/history': typeof HistoryRoute
   '/otp': typeof OtpRoute
   '/processing': typeof ProcessingRoute
   '/questionnaire': typeof QuestionnaireRoute
@@ -119,7 +134,6 @@ export interface FileRoutesByFullPath {
   '/admin/consent-reports': typeof AdminConsentReportsRoute
   '/admin/customers': typeof AdminCustomersRoute
   '/admin/dashboard': typeof AdminDashboardRoute
-  '/admin/login': typeof AdminLoginRoute
   '/admin/logins': typeof AdminLoginsRoute
   '/admin/responses': typeof AdminResponsesRoute
   '/admin/settings': typeof AdminSettingsRoute
@@ -127,7 +141,10 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/change-password': typeof ChangePasswordRoute
   '/consent': typeof ConsentRoute
+  '/dashboard': typeof DashboardRoute
+  '/history': typeof HistoryRoute
   '/otp': typeof OtpRoute
   '/processing': typeof ProcessingRoute
   '/questionnaire': typeof QuestionnaireRoute
@@ -136,7 +153,6 @@ export interface FileRoutesByTo {
   '/admin/consent-reports': typeof AdminConsentReportsRoute
   '/admin/customers': typeof AdminCustomersRoute
   '/admin/dashboard': typeof AdminDashboardRoute
-  '/admin/login': typeof AdminLoginRoute
   '/admin/logins': typeof AdminLoginsRoute
   '/admin/responses': typeof AdminResponsesRoute
   '/admin/settings': typeof AdminSettingsRoute
@@ -146,7 +162,10 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/admin': typeof AdminRouteWithChildren
+  '/change-password': typeof ChangePasswordRoute
   '/consent': typeof ConsentRoute
+  '/dashboard': typeof DashboardRoute
+  '/history': typeof HistoryRoute
   '/otp': typeof OtpRoute
   '/processing': typeof ProcessingRoute
   '/questionnaire': typeof QuestionnaireRoute
@@ -155,7 +174,6 @@ export interface FileRoutesById {
   '/admin/consent-reports': typeof AdminConsentReportsRoute
   '/admin/customers': typeof AdminCustomersRoute
   '/admin/dashboard': typeof AdminDashboardRoute
-  '/admin/login': typeof AdminLoginRoute
   '/admin/logins': typeof AdminLoginsRoute
   '/admin/responses': typeof AdminResponsesRoute
   '/admin/settings': typeof AdminSettingsRoute
@@ -166,7 +184,10 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/admin'
+    | '/change-password'
     | '/consent'
+    | '/dashboard'
+    | '/history'
     | '/otp'
     | '/processing'
     | '/questionnaire'
@@ -175,7 +196,6 @@ export interface FileRouteTypes {
     | '/admin/consent-reports'
     | '/admin/customers'
     | '/admin/dashboard'
-    | '/admin/login'
     | '/admin/logins'
     | '/admin/responses'
     | '/admin/settings'
@@ -183,7 +203,10 @@ export interface FileRouteTypes {
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
+    | '/change-password'
     | '/consent'
+    | '/dashboard'
+    | '/history'
     | '/otp'
     | '/processing'
     | '/questionnaire'
@@ -192,7 +215,6 @@ export interface FileRouteTypes {
     | '/admin/consent-reports'
     | '/admin/customers'
     | '/admin/dashboard'
-    | '/admin/login'
     | '/admin/logins'
     | '/admin/responses'
     | '/admin/settings'
@@ -201,7 +223,10 @@ export interface FileRouteTypes {
     | '__root__'
     | '/'
     | '/admin'
+    | '/change-password'
     | '/consent'
+    | '/dashboard'
+    | '/history'
     | '/otp'
     | '/processing'
     | '/questionnaire'
@@ -210,7 +235,6 @@ export interface FileRouteTypes {
     | '/admin/consent-reports'
     | '/admin/customers'
     | '/admin/dashboard'
-    | '/admin/login'
     | '/admin/logins'
     | '/admin/responses'
     | '/admin/settings'
@@ -220,7 +244,10 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AdminRoute: typeof AdminRouteWithChildren
+  ChangePasswordRoute: typeof ChangePasswordRoute
   ConsentRoute: typeof ConsentRoute
+  DashboardRoute: typeof DashboardRoute
+  HistoryRoute: typeof HistoryRoute
   OtpRoute: typeof OtpRoute
   ProcessingRoute: typeof ProcessingRoute
   QuestionnaireRoute: typeof QuestionnaireRoute
@@ -257,11 +284,32 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof OtpRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/history': {
+      id: '/history'
+      path: '/history'
+      fullPath: '/history'
+      preLoaderRoute: typeof HistoryRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/dashboard': {
+      id: '/dashboard'
+      path: '/dashboard'
+      fullPath: '/dashboard'
+      preLoaderRoute: typeof DashboardRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/consent': {
       id: '/consent'
       path: '/consent'
       fullPath: '/consent'
       preLoaderRoute: typeof ConsentRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/change-password': {
+      id: '/change-password'
+      path: '/change-password'
+      fullPath: '/change-password'
+      preLoaderRoute: typeof ChangePasswordRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/admin': {
@@ -306,13 +354,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminLoginsRouteImport
       parentRoute: typeof AdminRoute
     }
-    '/admin/login': {
-      id: '/admin/login'
-      path: '/login'
-      fullPath: '/admin/login'
-      preLoaderRoute: typeof AdminLoginRouteImport
-      parentRoute: typeof AdminRoute
-    }
     '/admin/dashboard': {
       id: '/admin/dashboard'
       path: '/dashboard'
@@ -349,7 +390,6 @@ interface AdminRouteChildren {
   AdminConsentReportsRoute: typeof AdminConsentReportsRoute
   AdminCustomersRoute: typeof AdminCustomersRoute
   AdminDashboardRoute: typeof AdminDashboardRoute
-  AdminLoginRoute: typeof AdminLoginRoute
   AdminLoginsRoute: typeof AdminLoginsRoute
   AdminResponsesRoute: typeof AdminResponsesRoute
   AdminSettingsRoute: typeof AdminSettingsRoute
@@ -361,7 +401,6 @@ const AdminRouteChildren: AdminRouteChildren = {
   AdminConsentReportsRoute: AdminConsentReportsRoute,
   AdminCustomersRoute: AdminCustomersRoute,
   AdminDashboardRoute: AdminDashboardRoute,
-  AdminLoginRoute: AdminLoginRoute,
   AdminLoginsRoute: AdminLoginsRoute,
   AdminResponsesRoute: AdminResponsesRoute,
   AdminSettingsRoute: AdminSettingsRoute,
@@ -373,7 +412,10 @@ const AdminRouteWithChildren = AdminRoute._addFileChildren(AdminRouteChildren)
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AdminRoute: AdminRouteWithChildren,
+  ChangePasswordRoute: ChangePasswordRoute,
   ConsentRoute: ConsentRoute,
+  DashboardRoute: DashboardRoute,
+  HistoryRoute: HistoryRoute,
   OtpRoute: OtpRoute,
   ProcessingRoute: ProcessingRoute,
   QuestionnaireRoute: QuestionnaireRoute,

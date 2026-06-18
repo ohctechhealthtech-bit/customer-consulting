@@ -8,6 +8,18 @@ CREATE DATABASE IF NOT EXISTS consentify_hub
 USE consentify_hub;
 
 -- ---------------------------------------------------------------------------
+-- company_master
+-- ---------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS company_master (
+  id INT UNSIGNED NOT NULL AUTO_INCREMENT,
+  company_name VARCHAR(255) NOT NULL,
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  UNIQUE KEY uk_company_name (company_name)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ---------------------------------------------------------------------------
 -- customer_master
 -- ---------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS customer_master (
@@ -17,14 +29,23 @@ CREATE TABLE IF NOT EXISTS customer_master (
   first_name VARCHAR(60) DEFAULT NULL,
   last_name VARCHAR(60) DEFAULT NULL,
   mobile VARCHAR(24) DEFAULT NULL,
-  date_of_birth DATE DEFAULT NULL,
+  age INT DEFAULT NULL,
+  company_id INT UNSIGNED DEFAULT NULL,
+  employee_code VARCHAR(100) DEFAULT NULL,
+  password_hash VARCHAR(255) DEFAULT NULL,
+  must_change_password TINYINT(1) NOT NULL DEFAULT 1,
+  last_password_change DATETIME DEFAULT NULL,
   is_active TINYINT(1) NOT NULL DEFAULT 1,
   created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   PRIMARY KEY (id),
   UNIQUE KEY uk_customer_email (email),
   UNIQUE KEY uk_customer_reference (reference_number),
-  KEY idx_customer_created (created_at)
+  KEY idx_customer_created (created_at),
+  KEY idx_customer_company (company_id),
+  CONSTRAINT fk_customer_company
+    FOREIGN KEY (company_id) REFERENCES company_master (id)
+    ON DELETE SET NULL ON UPDATE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ---------------------------------------------------------------------------
@@ -96,7 +117,7 @@ CREATE TABLE IF NOT EXISTS customer_response (
 CREATE TABLE IF NOT EXISTS customer_consent (
   id INT UNSIGNED NOT NULL AUTO_INCREMENT,
   customer_id INT UNSIGNED NOT NULL,
-  consent_status ENUM('allow', 'deny') NOT NULL,
+  consent_status ENUM('allow', 'deny', 'withdrawn') NOT NULL,
   reference_number VARCHAR(32) NOT NULL,
   submitted_at DATETIME NOT NULL,
   ip_address VARCHAR(45) DEFAULT NULL,
@@ -112,6 +133,23 @@ CREATE TABLE IF NOT EXISTS customer_consent (
   KEY idx_consent_status (consent_status),
   KEY idx_consent_submitted (submitted_at),
   CONSTRAINT fk_consent_customer
+    FOREIGN KEY (customer_id) REFERENCES customer_master (id)
+    ON DELETE CASCADE ON UPDATE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ---------------------------------------------------------------------------
+-- consent_history
+-- ---------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS consent_history (
+  id INT UNSIGNED NOT NULL AUTO_INCREMENT,
+  customer_id INT UNSIGNED NOT NULL,
+  action ENUM('ACCEPT', 'REJECT', 'WITHDRAW') NOT NULL,
+  performed_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  performed_by VARCHAR(255) NOT NULL,
+  PRIMARY KEY (id),
+  KEY idx_consent_history_customer (customer_id),
+  KEY idx_consent_history_action (action),
+  CONSTRAINT fk_consent_history_customer
     FOREIGN KEY (customer_id) REFERENCES customer_master (id)
     ON DELETE CASCADE ON UPDATE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

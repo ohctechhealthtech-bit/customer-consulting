@@ -23,7 +23,7 @@ import { Badge } from "@/components/ui/badge";
 import { adminFetch } from "@/lib/admin-api";
 
 export const Route = createFileRoute("/admin/audit")({
-  head: () => ({ meta: [{ title: "Audit Logs — Admin Console" }] }),
+  head: () => ({ meta: [{ title: "Audit Logs — Login Console" }] }),
   component: AuditPage,
 });
 

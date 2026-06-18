@@ -7,8 +7,11 @@ import {
   HeadContent,
   Scripts,
 } from "@tanstack/react-router";
+import { useRouterState, useNavigate } from "@tanstack/react-router";
 import { useEffect, type ReactNode } from "react";
 import { Toaster } from "@/components/ui/sonner";
+import { getSession } from "@/lib/portal-store";
+import { toast } from "sonner";
 
 import appCss from "../styles.css?url";
 import { reportLovableError } from "../lib/lovable-error-reporting";
@@ -116,6 +119,22 @@ function RootShell({ children }: { children: ReactNode }) {
 
 function RootComponent() {
   const { queryClient } = Route.useRouteContext();
+  const state = useRouterState();
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    const s = getSession();
+    const currentPath = state.location.pathname;
+
+    // List of routes that don't require password change (Auth & Policy)
+    const bypassRoutes = ["/", "/otp", "/change-password"];
+    const isBypass = bypassRoutes.includes(currentPath);
+
+    if (s.token && s.mustChangePassword && !isBypass) {
+      toast.info("Please update your password to continue");
+      navigate({ to: "/change-password" });
+    }
+  }, [state.location.pathname, navigate]);
 
   return (
     <QueryClientProvider client={queryClient}>

@@ -154,9 +154,57 @@ async function sendConsentConfirmationEmail(to, details) {
   return sendEmail({ to, subject, text, html });
 }
 
+/**
+ * Sends Account Creation email
+ */
+async function sendAccountCreationEmail(to, details) {
+  const { customerName, temporaryPassword } = details;
+  const greeting = customerName ? `Hello ${customerName},` : 'Hello,';
+  const subject = 'Welcome to OHCTECH — Your Account Details';
+  const loginUrl = env.clientUrl || 'http://localhost:5173';
+
+  const text = `${greeting}\n\nYour account has been successfully created. You can now log in using your email and the temporary password provided below.\n\nEmail: ${to}\nTemporary Password: ${temporaryPassword}\n\nLogin here: ${loginUrl}\n\nRegards,\nOHCTECH Support`;
+
+  const html = `
+    <div style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; max-width: 500px; margin: 0 auto; border: 1px solid #e2e8f0; border-radius: 12px; overflow: hidden; background-color: #ffffff;">
+      <div style="background-color: #1e3a8a; padding: 24px; text-align: center;">
+        <h1 style="color: #ffffff; margin: 0; font-size: 20px;">Welcome to OHCTECH</h1>
+      </div>
+      <div style="padding: 32px;">
+        <p style="font-size: 16px; color: #475569; margin: 0;">${greeting}</p>
+        <p style="font-size: 16px; color: #475569; margin: 20px 0;">Your account has been successfully created. Use the credentials below to log in and access your portal.</p>
+        
+        <div style="background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 20px; margin: 24px 0;">
+          <div style="margin-bottom: 12px;">
+            <span style="font-size: 12px; font-weight: 600; color: #64748b; text-transform: uppercase; letter-spacing: 0.05em;">Email Address</span>
+            <div style="font-size: 16px; font-weight: bold; color: #1e3a8a; margin-top: 4px;">${to}</div>
+          </div>
+          <div>
+            <span style="font-size: 12px; font-weight: 600; color: #64748b; text-transform: uppercase; letter-spacing: 0.05em;">Temporary Password</span>
+            <div style="font-size: 18px; font-weight: bold; color: #b91c1c; font-family: monospace; margin-top: 4px; letter-spacing: 1px;">${temporaryPassword}</div>
+          </div>
+        </div>
+
+        <div style="text-align: center; margin: 32px 0;">
+          <a href="${loginUrl}" style="display: inline-block; background-color: #1e3a8a; color: #ffffff; padding: 12px 32px; border-radius: 8px; text-decoration: none; font-weight: 600; font-size: 16px;">Log In to Portal</a>
+        </div>
+        
+        <p style="font-size: 14px; color: #64748b; margin: 0;">For security reasons, you will be asked to change this password upon your first login.</p>
+        
+        <p style="font-size: 16px; color: #475569; margin: 32px 0 0 0;">Regards,<br /><strong>OHCTECH Support</strong></p>
+        <hr style="border: 0; border-top: 1px solid #e2e8f0; margin: 32px 0;" />
+        <p style="font-size: 12px; color: #94a3b8; text-align: center;">&copy; 2026 OHCTECH. All rights reserved.</p>
+      </div>
+    </div>
+  `;
+
+  return sendEmail({ to, subject, text, html });
+}
+
 module.exports = {
   verifySMTP,
   sendEmail,
   sendOtpEmail,
-  sendConsentConfirmationEmail
+  sendConsentConfirmationEmail,
+  sendAccountCreationEmail
 };

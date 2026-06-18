@@ -44,14 +44,16 @@ type CustomerDetail = {
   name: string;
   email: string;
   mobile: string | null;
-  dateOfBirth: string | null;
+  age: number | null;
+  companyName: string | null;
+  employeeCode: string | null;
   consent: "Accepted" | "Rejected";
   submittedAt: string | null;
   responses: QuestionResponse[];
 };
 
 export const Route = createFileRoute("/admin/customers")({
-  head: () => ({ meta: [{ title: "Patients — Admin Console" }] }),
+  head: () => ({ meta: [{ title: "Patients — Login Console" }] }),
   component: CustomersPage,
 });
 
@@ -288,7 +290,9 @@ function CustomersPage() {
               <dl className="grid grid-cols-2 gap-3 text-sm">
                 <Info k="Email" v={detail.email} />
                 <Info k="Mobile" v={detail.mobile} />
-                <Info k="Date of Birth" v={detail.dateOfBirth ? new Date(detail.dateOfBirth).toLocaleDateString() : null} />
+                <Info k="Age" v={detail.age ? String(detail.age) : null} />
+                <Info k="Company" v={detail.companyName} />
+                <Info k="Employee Code" v={detail.employeeCode} />
                 <Info k="Consent" v={detail.consent} />
                 <Info k="Submitted" v={detail.submittedAt ? new Date(detail.submittedAt).toLocaleString() : null} />
               </dl>

@@ -19,9 +19,9 @@ const submitValidation = [
 
 const router = require('express').Router();
 
-router.get('/questions', questionnaireController.getQuestions);
+router.get('/', questionnaireController.getQuestions);
 router.post(
-  '/questionnaire/submit',
+  '/submit',
   authenticate,
   submitValidation,
   questionnaireController.submitQuestionnaire,

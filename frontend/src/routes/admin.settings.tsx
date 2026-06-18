@@ -9,7 +9,7 @@ import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 
 export const Route = createFileRoute("/admin/settings")({
-  head: () => ({ meta: [{ title: "Settings — Admin Console" }] }),
+  head: () => ({ meta: [{ title: "Settings — Login Console" }] }),
   component: SettingsPage,
 });
 

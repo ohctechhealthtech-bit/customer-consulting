@@ -16,7 +16,7 @@ import { Badge } from "@/components/ui/badge";
 import { adminFetch } from "@/lib/admin-api";
 
 export const Route = createFileRoute("/admin/responses")({
-  head: () => ({ meta: [{ title: "Responses — Admin Console" }] }),
+  head: () => ({ meta: [{ title: "Responses — Login Console" }] }),
   component: ResponsesPage,
 });
 

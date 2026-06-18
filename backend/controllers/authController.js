@@ -34,4 +34,29 @@ async function logout(req, res) {
   }
 }
 
-module.exports = { sendOtp, verifyOtp, logout };
+async function changePassword(req, res) {
+  try {
+    const { password } = req.body;
+    const result = await authService.changePassword(
+      req.user.customerId,
+      password,
+      req.user.email,
+      req.clientContext,
+    );
+    return success(res, result, 'Password updated successfully');
+  } catch (err) {
+    return error(res, err.message || 'Password update failed', err.statusCode || 500);
+  }
+}
+
+async function login(req, res) {
+  try {
+    const { email, password } = req.body;
+    const result = await authService.login(email, password, req.clientContext);
+    return success(res, result, 'Signed in successfully');
+  } catch (err) {
+    return error(res, err.message || 'Login failed', err.statusCode || 401);
+  }
+}
+
+module.exports = { sendOtp, verifyOtp, login, logout, changePassword };

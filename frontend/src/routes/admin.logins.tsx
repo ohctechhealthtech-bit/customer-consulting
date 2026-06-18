@@ -23,7 +23,7 @@ import { Badge } from "@/components/ui/badge";
 import { adminFetch } from "@/lib/admin-api";
 
 export const Route = createFileRoute("/admin/logins")({
-  head: () => ({ meta: [{ title: "Login History — Admin Console" }] }),
+  head: () => ({ meta: [{ title: "Login History — Login Console" }] }),
   component: LoginsPage,
 });
 

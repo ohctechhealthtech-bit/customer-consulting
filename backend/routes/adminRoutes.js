@@ -11,8 +11,8 @@ const loginValidation = [
 ];
 
 const router = require('express').Router();
-
-router.post('/login', loginValidation, adminAuthController.login);
+// Admin login is now handled via the central /api/auth/login endpoint
+// router.post('/login', loginValidation, adminAuthController.login);
 
 router.use(authenticateAdmin);
 

@@ -17,7 +17,7 @@ async function login(email, password, clientContext) {
   await logAuditEvent({
     eventCode: 'ADMIN_LOGIN',
     userIdentifier: admin.email,
-    description: `Admin login from ${clientContext.deviceType || 'unknown device'}`,
+    description: `Login from ${clientContext.deviceType || 'unknown device'}`,
     ...clientContext,
     metadata: { adminId: admin.id },
   });

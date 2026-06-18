@@ -4,8 +4,12 @@ const { authenticate } = require('../middleware/auth');
 const consentController = require('../controllers/consentController');
 
 const consentValidation = [
+  body('action')
+    .optional()
+    .isIn(['ACCEPT', 'REJECT', 'WITHDRAW'])
+    .withMessage('Invalid action'),
   body('consent')
-    .trim()
+    .optional()
     .isIn(['allow', 'deny'])
     .withMessage('Consent must be "allow" or "deny"'),
   validateRequest,

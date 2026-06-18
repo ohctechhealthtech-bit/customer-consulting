@@ -41,6 +41,16 @@ const consentModel = {
     return rows[0] || null;
   },
 
+  async getHistoryByCustomerId(customerId) {
+    const [rows] = await pool.query(
+      `SELECT * FROM consent_history
+       WHERE customer_id = :customerId
+       ORDER BY performed_at DESC`,
+      { customerId },
+    );
+    return rows;
+  },
+
   async getAll(filters = {}) {
     let sql = `
       SELECT cc.*, cm.email
@@ -107,6 +117,21 @@ const consentModel = {
       { months },
     );
     return rows;
+  },
+
+  async logHistory(data) {
+    await pool.query(
+      `INSERT INTO consent_history
+        (customer_id, action, performed_by, performed_at)
+       VALUES
+        (:customerId, :action, :performedBy, :performedAt)`,
+      {
+        customerId: data.customerId,
+        action: data.action,
+        performedBy: data.performedBy,
+        performedAt: data.performedAt || new Date(),
+      },
+    );
   },
 };
 

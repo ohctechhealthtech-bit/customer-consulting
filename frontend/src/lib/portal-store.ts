@@ -10,6 +10,8 @@ export type PortalSession = {
   consent?: "allow" | "deny";
   referenceNumber?: string;
   submittedAt?: string;
+  mustChangePassword?: boolean;
+  registered?: boolean;
 };
 
 const KEY = "portal_session_v1";

@@ -37,7 +37,9 @@ const customerModel = {
         first_name = :firstName,
         last_name = :lastName,
         mobile = :mobile,
-        date_of_birth = :dateOfBirth,
+        age = :age,
+        company_id = :companyId,
+        employee_code = :employeeCode,
         updated_at = CURRENT_TIMESTAMP
       WHERE id = :id`,
       {
@@ -45,7 +47,9 @@ const customerModel = {
         firstName: data.firstName || null,
         lastName: data.lastName || null,
         mobile: data.mobile || null,
-        dateOfBirth: data.dob || null,
+        age: data.age || null,
+        companyId: data.companyId || null,
+        employeeCode: data.employeeCode || null,
       },
     );
   },
@@ -57,13 +61,37 @@ const customerModel = {
     );
   },
 
+  async updatePassword(id, passwordHash) {
+    await pool.query(
+      `UPDATE customer_master SET
+        password_hash = :passwordHash,
+        must_change_password = 0,
+        last_password_change = CURRENT_TIMESTAMP,
+        updated_at = CURRENT_TIMESTAMP
+      WHERE id = :id`,
+      { id, passwordHash },
+    );
+  },
+
+  async requirePasswordChange(id) {
+    await pool.query(
+      'UPDATE customer_master SET must_change_password = 1 WHERE id = :id',
+      { id },
+    );
+  },
+
   async purgePersonalData(id) {
     await pool.query(
       `UPDATE customer_master SET
         first_name = NULL,
         last_name = NULL,
         mobile = NULL,
-        date_of_birth = NULL,
+        age = NULL,
+        company_id = NULL,
+        employee_code = NULL,
+        password_hash = NULL,
+        must_change_password = 1,
+        last_password_change = NULL,
         updated_at = CURRENT_TIMESTAMP
       WHERE id = :id`,
       { id },
@@ -76,7 +104,7 @@ const customerModel = {
         cm.id,
         cm.email,
         cc.reference_number AS reference,
-        COALESCE(cc.customer_name, CONCAT(COALESCE(cm.first_name, ''), ' ', COALESCE(cm.last_name, ''))) AS name,
+        CONCAT(COALESCE(cm.first_name, ''), ' ', COALESCE(cm.last_name, '')) AS name,
         cm.mobile,
         cc.consent_status,
         cc.submitted_at AS submittedAt
@@ -95,7 +123,6 @@ const customerModel = {
       sql += ` AND (
         cm.email LIKE :search OR
         cc.reference_number LIKE :search OR
-        cc.customer_name LIKE :search OR
         CONCAT(cm.first_name, ' ', cm.last_name) LIKE :search
       )`;
       params.search = `%${filters.search}%`;
@@ -130,7 +157,7 @@ const customerModel = {
         cm.id,
         cm.email,
         cc.reference_number AS reference,
-        COALESCE(cc.customer_name, CONCAT(COALESCE(cm.first_name, ''), ' ', COALESCE(cm.last_name, ''))) AS name,
+        CONCAT(COALESCE(cm.first_name, ''), ' ', COALESCE(cm.last_name, '')) AS name,
         cm.mobile,
         cc.consent_status,
         cc.submitted_at AS submittedAt
@@ -144,7 +171,6 @@ const customerModel = {
       sql += ` AND (
         cm.email LIKE :search OR
         cc.reference_number LIKE :search OR
-        cc.customer_name LIKE :search OR
         CONCAT(cm.first_name, ' ', cm.last_name) LIKE :search
       )`;
       params.search = `%${filters.search}%`;
@@ -202,11 +228,12 @@ const customerModel = {
     const [customerRows] = await pool.query(
       `SELECT cm.id, cm.email,
               cc.reference_number AS reference,
-              COALESCE(cc.customer_name, CONCAT(COALESCE(cm.first_name, ''), ' ', COALESCE(cm.last_name, ''))) AS name,
-              cm.mobile, cm.date_of_birth AS dateOfBirth,
+              CONCAT(COALESCE(cm.first_name, ''), ' ', COALESCE(cm.last_name, '')) AS name,
+              cm.mobile, cm.age, com.company_name AS companyName, cm.employee_code AS employeeCode,
               cc.consent_status AS consentStatus, cc.submitted_at AS submittedAt
        FROM customer_master cm
        INNER JOIN customer_consent cc ON cc.customer_id = cm.id
+       LEFT JOIN company_master com ON com.id = cm.company_id
        WHERE cm.id = :customerId
        ORDER BY cc.submitted_at DESC
        LIMIT 1`,
@@ -231,7 +258,9 @@ const customerModel = {
       name: customer.name || null,
       email: customer.email,
       mobile: customer.mobile || null,
-      dateOfBirth: customer.dateOfBirth ? new Date(customer.dateOfBirth).toISOString() : null,
+      age: customer.age || null,
+      companyName: customer.companyName || null,
+      employeeCode: customer.employeeCode || null,
       consent: customer.consentStatus === 'allow' ? 'Accepted' : 'Rejected',
       submittedAt: customer.submittedAt ? new Date(customer.submittedAt).toISOString() : null,
       responses: responses.map((r) => ({

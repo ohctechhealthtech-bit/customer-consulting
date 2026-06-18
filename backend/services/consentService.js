@@ -5,18 +5,23 @@ const consentModel = require('../models/consentModel');
 const auditLogModel = require('../models/auditLogModel');
 const { generateReferenceNumber } = require('../utils/reference');
 const { logAuditEvent, buildAuditEntry } = require('./auditService');
-const { sendConsentConfirmationEmail } = require('./emailService');
+const { sendConsentConfirmationEmail, sendAccountCreationEmail } = require('./emailService');
+const { hashPassword, generateTemporaryPassword } = require('../utils/password');
 
-async function submitConsent(customerId, email, consentChoice, clientContext) {
-  if (!['allow', 'deny'].includes(consentChoice)) {
-    const err = new Error('Consent must be either "allow" or "deny"');
+async function submitConsent(customerId, email, action, clientContext) {
+  const validActions = ['ACCEPT', 'REJECT', 'WITHDRAW'];
+  if (!validActions.includes(action)) {
+    const err = new Error(`Invalid action: ${action}. Must be one of ${validActions.join(', ')}`);
     err.statusCode = 400;
     throw err;
   }
 
-  // Every submission creates a new consent record (history), so we no longer return early
-  // if an existing one is found for this customer.
-
+  const consentStatusMap = {
+    ACCEPT: 'allow',
+    REJECT: 'deny',
+    WITHDRAW: 'withdrawn',
+  };
+  const consentChoice = consentStatusMap[action];
   const referenceNumber = generateReferenceNumber();
   const submittedAt = new Date();
 
@@ -34,8 +39,8 @@ async function submitConsent(customerId, email, consentChoice, clientContext) {
 
   auditHistory.push(
     buildAuditEntry(
-      'CONSENT_SUBMITTED',
-      `Consent ${consentChoice === 'allow' ? 'granted' : 'denied'} by ${email}`,
+      'CONSENT_ACTION',
+      `Consent ${action.toLowerCase()}ed by ${email}`,
       clientContext,
     ),
   );
@@ -45,31 +50,50 @@ async function submitConsent(customerId, email, consentChoice, clientContext) {
   try {
     await connection.beginTransaction();
 
-    if (consentChoice === 'deny') {
+    if (action === 'REJECT' || action === 'WITHDRAW') {
       await connection.query('DELETE FROM customer_response WHERE customer_id = ?', [customerId]);
       await connection.query(
         `UPDATE customer_master SET
-          first_name = NULL, last_name = NULL, mobile = NULL, date_of_birth = NULL
+          first_name = NULL, last_name = NULL, mobile = NULL,
+          age = NULL, company_id = NULL, employee_code = NULL,
+          password_hash = NULL, must_change_password = 1, last_password_change = NULL
          WHERE id = ?`,
         [customerId],
       );
-    } else {
-      await connection.query(
-        'UPDATE customer_master SET reference_number = ? WHERE id = ?',
-        [referenceNumber, customerId],
-      );
+    } else if (action === 'ACCEPT') {
+      const needsPassword = !customer.password_hash;
+      
+      if (needsPassword) {
+        const tempPassword = generateTemporaryPassword();
+        const passwordHash = hashPassword(tempPassword);
+
+        await connection.query(
+          `UPDATE customer_master SET
+            reference_number = ?,
+            password_hash = ?,
+            must_change_password = 1,
+            last_password_change = NULL
+           WHERE id = ?`,
+          [referenceNumber, passwordHash, customerId],
+        );
+        clientContext._tempPassword = tempPassword;
+      } else {
+        await connection.query(
+          'UPDATE customer_master SET reference_number = ? WHERE id = ?',
+          [referenceNumber, customerId],
+        );
+      }
     }
 
     await connection.query(
       `INSERT INTO customer_consent
-        (customer_id, consent_status, reference_number, customer_name, submitted_at,
+        (customer_id, consent_status, reference_number, submitted_at,
          ip_address, user_agent, browser, operating_system, device_type, audit_history)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         customerId,
         consentChoice,
         referenceNumber,
-        customerName,
         submittedAt,
         clientContext.ipAddress,
         clientContext.userAgent,
@@ -78,6 +102,13 @@ async function submitConsent(customerId, email, consentChoice, clientContext) {
         clientContext.deviceType,
         JSON.stringify(auditHistory),
       ],
+    );
+
+    // Track consent history
+    await connection.query(
+      `INSERT INTO consent_history (customer_id, action, performed_by, performed_at)
+       VALUES (?, ?, ?, ?)`,
+      [customerId, action, email, submittedAt],
     );
 
     await connection.commit();
@@ -89,15 +120,15 @@ async function submitConsent(customerId, email, consentChoice, clientContext) {
   }
 
   await logAuditEvent({
-    eventCode: 'CONSENT_SUBMITTED',
+    eventCode: 'CONSENT_ACTION',
     userIdentifier: email,
     customerId,
     description:
-      consentChoice === 'allow'
+      action === 'ACCEPT'
         ? `Data storage consent granted (${referenceNumber})`
-        : `Data storage consent denied — personal data purged (${referenceNumber})`,
+        : `Data storage consent ${action.toLowerCase()}ed — personal data purged (${referenceNumber})`,
     ...clientContext,
-    metadata: { referenceNumber, consentStatus: consentChoice },
+    metadata: { referenceNumber, action, consentStatus: consentChoice },
   });
 
   // Send confirmation email asynchronously (don't block the response)
@@ -106,6 +137,13 @@ async function submitConsent(customerId, email, consentChoice, clientContext) {
     referenceNumber,
     consentStatus: consentChoice,
   }).catch((err) => console.error('Failed to send consent confirmation email:', err.message));
+
+  if (action === 'ACCEPT' && clientContext._tempPassword) {
+    sendAccountCreationEmail(email, {
+      customerName,
+      temporaryPassword: clientContext._tempPassword,
+    }).catch((err) => console.error('Failed to send account creation email:', err.message));
+  }
 
   return {
     referenceNumber,

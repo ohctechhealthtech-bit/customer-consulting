@@ -22,6 +22,8 @@ const router = require('express').Router();
 
 router.post('/send-otp', otpLimiter, sendOtpValidation, authController.sendOtp);
 router.post('/verify-otp', verifyOtpValidation, authController.verifyOtp);
+router.post('/login', authController.login);
 router.post('/logout', authenticate, authController.logout);
+router.post('/change-password', authenticate, authController.changePassword);
 
 module.exports = router;

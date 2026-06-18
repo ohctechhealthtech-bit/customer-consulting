@@ -26,12 +26,15 @@ export const COUNTRIES: Country[] = [
 ];
 
 function formatNumber(dial: string, raw: string): string {
-  const digits = raw.replace(/\D/g, "").slice(0, 12);
-  if (dial === "+91" && digits.length > 5) return `${digits.slice(0, 5)} ${digits.slice(5)}`;
-  if (dial === "+1" && digits.length > 6)
-    return `${digits.slice(0, 3)} ${digits.slice(3, 6)} ${digits.slice(6)}`;
-  if (digits.length > 4) return `${digits.slice(0, 4)} ${digits.slice(4)}`;
-  return digits;
+  const digits = raw.replace(/\D/g, "");
+  const maxLength = dial === "+91" ? 10 : 12;
+  const limited = digits.slice(0, maxLength);
+
+  if (dial === "+91" && limited.length > 5) return `${limited.slice(0, 5)} ${limited.slice(5)}`;
+  if (dial === "+1" && limited.length > 6)
+    return `${limited.slice(0, 3)} ${limited.slice(3, 6)} ${limited.slice(6)}`;
+  if (limited.length > 4) return `${limited.slice(0, 4)} ${limited.slice(4)}`;
+  return limited;
 }
 
 export function CountryPhoneInput({

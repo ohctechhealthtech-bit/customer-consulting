@@ -5,9 +5,9 @@ async function login(req, res) {
   try {
     const { email, password } = req.body;
     const result = await adminAuthService.login(email, password, req.clientContext);
-    return success(res, result, 'Admin login successful');
+    return success(res, result, 'Login successful');
   } catch (err) {
-    return error(res, err.message || 'Admin login failed', err.statusCode || 401);
+    return error(res, err.message || 'Login failed', err.statusCode || 401);
   }
 }
 

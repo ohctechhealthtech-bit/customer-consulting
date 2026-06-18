@@ -3,11 +3,13 @@ const { success, error } = require('../utils/apiResponse');
 
 async function submitConsent(req, res) {
   try {
-    const { consent } = req.body;
+    const { action, consent } = req.body;
+    const finalAction = action || (consent === 'allow' ? 'ACCEPT' : 'REJECT');
+    
     const result = await consentService.submitConsent(
       req.user.customerId,
       req.user.email,
-      consent,
+      finalAction,
       req.clientContext,
     );
     return success(res, result, 'Consent recorded successfully', 201);
