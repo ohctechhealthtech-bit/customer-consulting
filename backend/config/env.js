@@ -1,4 +1,4 @@
-require('dotenv').config();
+require('dotenv').config({ override: true });
 
 const required = ['DB_HOST', 'DB_USER', 'DB_PASSWORD', 'DB_NAME', 'JWT_SECRET', 'SMTP_HOST', 'SMTP_PORT', 'SMTP_USER', 'SMTP_PASS'];
 
@@ -9,9 +9,9 @@ for (const key of required) {
 }
 
 module.exports = {
-  port: parseInt(process.env.PORT, 10) || 5000,
+  port: parseInt(process.env.API_PORT || process.env.PORT, 10) || 5000,
   nodeEnv: process.env.NODE_ENV || 'development',
-  corsOrigin: (process.env.CORS_ORIGIN || 'http://localhost:5173').split(',').map((s) => s.trim()),
+  corsOrigin: (process.env.CORS_ORIGIN || 'http://localhost:8080,http://localhost:5173,http://localhost:8081').split(',').map((s) => s.trim()),
   db: {
     host: process.env.DB_HOST || 'localhost',
     port: parseInt(process.env.DB_PORT, 10) || 3306,
