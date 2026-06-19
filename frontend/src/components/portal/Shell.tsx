@@ -13,12 +13,12 @@ export function BrandLogo({ size = "md" }: { size?: "sm" | "md" | "lg" }) {
   );
 }
 
-export function BrandMark({ subtitle = "Consent Portal" }: { subtitle?: string }) {
+export function BrandMark({ subtitle = "CONSENT PORTAL" }: { subtitle?: string }) {
   return (
-    <div className="flex items-center gap-3">
+    <div className="flex items-center gap-4">
       <BrandLogo size="md" />
-      <div className="leading-tight border-l border-slate-200 pl-3 h-8 flex flex-col justify-center">
-        <div className="text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground whitespace-nowrap">
+      <div className="leading-tight border-l-2 border-slate-200 pl-4 h-8 flex flex-col justify-center">
+        <div className="text-[16px] font-bold uppercase tracking-[0.22em] text-slate-800 whitespace-nowrap">
           {subtitle}
         </div>
       </div>
@@ -29,15 +29,15 @@ export function BrandMark({ subtitle = "Consent Portal" }: { subtitle?: string }
 export function PortalShell({ children }: { children: ReactNode }) {
   return (
     <div className="min-h-screen bg-[#f5f8fb]">
-      <header className="border-b border-slate-200/70 bg-white">
-        <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-4 sm:px-6">
+      <header className="border-b border-slate-200 bg-white sticky top-0 z-50">
+        <div className="flex h-16 w-full items-center justify-between px-4 sm:px-6">
           <Link to="/">
             <BrandMark />
           </Link>
         </div>
       </header>
-      <main className="mx-auto w-full max-w-6xl px-4 py-10 sm:px-6">{children}</main>
-      <footer className="py-6 text-center text-xs text-muted-foreground">
+      <main className="w-full px-4 py-6 sm:px-6">{children}</main>
+      <footer className="w-full px-4 py-8 text-center text-[10px] font-bold uppercase tracking-widest text-slate-400">
         © {new Date().getFullYear()} OHCTECH · Patient Consent & Data Collection
       </footer>
     </div>
