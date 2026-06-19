@@ -20,6 +20,7 @@ router.get('/dashboard', adminController.getDashboard);
 router.get('/customers', adminController.getCustomers);
 router.get('/customers/:id', adminController.getCustomerDetail);
 router.get('/customers-with-responses', adminController.getCustomersWithResponses);
+router.get('/customers-with-responses/export', adminController.exportResponsesCsv);
 router.get('/consents', adminController.getConsents);
 router.get('/login-history', adminController.getLoginHistory);
 router.get('/audit-logs', adminController.getAuditLogs);

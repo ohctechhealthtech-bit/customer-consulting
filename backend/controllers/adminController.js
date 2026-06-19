@@ -64,6 +64,17 @@ async function getCustomersWithResponses(req, res) {
   }
 }
 
+async function exportResponsesCsv(req, res) {
+  try {
+    const csvString = await adminService.exportCustomersWithResponsesCsv(req.query);
+    res.setHeader('Content-Type', 'text/csv');
+    res.setHeader('Content-Disposition', 'attachment; filename=responses_export.csv');
+    return res.status(200).send(csvString);
+  } catch (err) {
+    return error(res, err.message || 'Failed to export CSV', err.statusCode || 500);
+  }
+}
+
 module.exports = {
   getDashboard,
   getCustomers,
@@ -72,4 +83,5 @@ module.exports = {
   getAuditLogs,
   getCustomersWithResponses,
   getCustomerDetail,
+  exportResponsesCsv,
 };

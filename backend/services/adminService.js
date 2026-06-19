@@ -1,6 +1,7 @@
 const customerModel = require('../models/customerModel');
 const consentModel = require('../models/consentModel');
 const auditLogModel = require('../models/auditLogModel');
+const { exportToCsv } = require('../utils/csvExport');
 
 async function getDashboard() {
   const [stats, dailyRows, deviceDistribution, browserUsage, customers, logins, todayLogins] =
@@ -189,6 +190,52 @@ async function getCustomersWithResponses(query = {}) {
   return { customers, pagination: { limit } };
 }
 
+async function exportCustomersWithResponsesCsv(query = {}) {
+  // Fetch all matching data without a strict pagination limit for exporting.
+  // Using a larger limit like 10000.
+  const customers = await customerModel.getAllWithResponses({
+    search: query.search || query.q,
+    limit: 10000,
+  });
+
+  if (customers.length === 0) {
+     return exportToCsv([], ['Reference', 'Name', 'Email', 'Mobile', 'Consent', 'Submitted At']);
+  }
+
+  // Find all unique question labels to use as headers
+  const questionHeaders = new Set();
+  customers.forEach(c => {
+    c.responses.forEach(r => {
+      questionHeaders.add(r.label);
+    });
+  });
+
+  const dynamicHeaders = Array.from(questionHeaders);
+  
+  const csvData = customers.map(c => {
+    const row = {
+      'Reference': c.reference || '',
+      'Name': c.name || '',
+      'Email': c.email || '',
+      'Mobile': c.mobile || '',
+      'Consent': c.consent || '',
+      'Submitted At': c.submittedAt ? new Date(c.submittedAt).toLocaleString() : '',
+    };
+    
+    // Fill in dynamic question answers
+    dynamicHeaders.forEach(header => {
+       const response = c.responses.find(r => r.label === header);
+       row[header] = response ? response.value : '';
+    });
+    
+    return row;
+  });
+
+  const fields = ['Reference', 'Name', 'Email', 'Mobile', 'Consent', 'Submitted At', ...dynamicHeaders];
+  
+  return exportToCsv(csvData, fields);
+}
+
 async function getCustomerDetail(id) {
   const customer = await customerModel.getCustomerDetail(id);
   if (!customer) {
@@ -206,5 +253,6 @@ module.exports = {
   getLoginHistory,
   getAuditLogs,
   getCustomersWithResponses,
+  exportCustomersWithResponsesCsv,
   getCustomerDetail,
 };

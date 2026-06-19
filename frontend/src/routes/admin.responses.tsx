@@ -14,6 +14,7 @@ import {
 } from "@/components/ui/accordion";
 import { Badge } from "@/components/ui/badge";
 import { adminFetch } from "@/lib/admin-api";
+import { getAdminToken } from "@/lib/admin-store";
 
 export const Route = createFileRoute("/admin/responses")({
   head: () => ({ meta: [{ title: "Responses — Login Console" }] }),
@@ -74,6 +75,37 @@ function ResponsesPage() {
 
   const rows = data?.customers ?? [];
 
+  const handleExport = async () => {
+    try {
+      const token = getAdminToken();
+      if (!token) throw new Error("Admin authentication required");
+
+      const params = new URLSearchParams();
+      if (q) params.set("search", q);
+
+      const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000";
+      const res = await fetch(`${API_URL}/api/admin/customers-with-responses/export?${params.toString()}`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+
+      if (!res.ok) throw new Error("Failed to export data");
+
+      const blob = await res.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `responses_export_${new Date().toISOString().split('T')[0]}.csv`;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+      
+      toast.success("Export downloaded successfully");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Export failed");
+    }
+  };
+
   return (
     <AdminLayout title="Questionnaire Responses">
       <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
@@ -87,7 +119,7 @@ function ResponsesPage() {
               className="h-10 pl-9"
             />
           </div>
-          <Button variant="outline" onClick={() => toast.success("Export started (demo)")}>
+          <Button variant="outline" onClick={handleExport}>
             <Download className="mr-2 h-4 w-4" /> Export CSV
           </Button>
         </div>
