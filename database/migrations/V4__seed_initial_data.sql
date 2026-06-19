@@ -28,11 +28,11 @@ SET is_active = 0
 WHERE question_key IN ('address.line2', 'additional.occupation', 'additional.income', 'additional.comments');
 
 -- Default OHCTECH admin (password: Admin@123)
--- Hash generated using the project's internal salt/algo
+-- Hash generated using crypto.scryptSync via the project's password.js utility
 INSERT INTO admin_users (email, password_hash, full_name)
 VALUES (
   'admin@ohctech.com',
-  'ohctech_admin_seed:468837d7f090c2bdd6ce3c29fe4cab6e082769fe1b55866a9bcb30d9876dc693d92637b5be22d1f6b824a788267e8f7e9808e83d235a131a43126c8050df9367',
+  '2823697d11b89c2dce01f17f9cadaffe:a6cafe1b5902f7230f74d7bf62f66c29062862f7b9159375672d5bce640f8e4cdc6bbb10f7973f6837460b045c528a5ef5d98c0e46d25fbd9f9152d1a1495511',
   'OHCTECH Administrator'
 )
 ON DUPLICATE KEY UPDATE
