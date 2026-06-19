@@ -19,6 +19,7 @@ module.exports = {
     password: process.env.DB_PASSWORD || '',
     database: process.env.DB_NAME || 'consentify_hub',
   },
+  portalUrl: process.env.FRONTEND_URL || process.env.PORTAL_URL || 'http://localhost:8081',
   jwt: {
     secret: process.env.JWT_SECRET || 'dev_secret_change_me',
     expiresIn: process.env.JWT_EXPIRES_IN || '24h',

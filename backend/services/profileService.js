@@ -83,6 +83,8 @@ async function updateProfile(customerId, updates, performedByEmail, clientContex
     });
   }
 
+  const emailChange = changes.find((c) => c.fieldName === 'Email Address');
+
   if (changes.length === 0) {
     return { message: 'No changes detected.', changes: [] };
   }
@@ -108,23 +110,24 @@ async function updateProfile(customerId, updates, performedByEmail, clientContex
       { ...namedParams, customerId },
     );
 
-    const emailChange = changes.find((c) => c.fieldName === 'Email Address');
     if (emailChange) {
       await conn.query('UPDATE login_history SET email = :email WHERE customer_id = :customerId', { email: emailChange.newValue, customerId });
       await conn.query('UPDATE audit_logs SET user_identifier = :email WHERE customer_id = :customerId', { email: emailChange.newValue, customerId });
     }
 
+    const now = new Date();
     for (const ch of changes) {
       await conn.query(
         `INSERT INTO profile_update_history
            (customer_id, field_name, old_value, new_value, updated_by, updated_at)
-         VALUES (:customerId, :fieldName, :oldValue, :newValue, :updatedBy, NOW())`,
+         VALUES (:customerId, :fieldName, :oldValue, :newValue, :updatedBy, :updatedAt)`,
         {
           customerId,
           fieldName: ch.fieldName,
           oldValue: ch.oldValue || null,
           newValue: ch.newValue || null,
           updatedBy: performedByEmail,
+          updatedAt: now
         },
       );
     }
@@ -148,7 +151,7 @@ async function updateProfile(customerId, updates, performedByEmail, clientContex
   }).catch(e => console.error(e));
 
   if (emailChange) {
-    const loginUrl = env.clientUrl || 'http://localhost:5173';
+    const loginUrl = env.portalUrl;
     const notifyChange = async (to, isOld) => {
       const subject = 'OHCTECH: Email Address Updated';
       const html = `<div style="font-family:sans-serif;padding:24px;border:1px solid #eee;border-radius:12px;">
@@ -174,10 +177,39 @@ async function getProfileHistory(customerId) {
      FROM profile_update_history
      WHERE customer_id = :customerId
      ORDER BY updated_at DESC
-     LIMIT 100`,
+     LIMIT 300`,
     { customerId },
   );
-  return rows;
+
+  // Group individual field changes by timestamp and performer
+  const groups = [];
+  rows.forEach(row => {
+    const ts = new Date(row.updatedAt).getTime();
+    // We allow a 1-second window just in case SQL and JS have micro-drifts, 
+    // although they should be identical due to our updateProfile fix.
+    const last = groups[groups.length - 1];
+    if (last && Math.abs(new Date(last.updatedAt).getTime() - ts) < 1000 && last.updatedBy === row.updatedBy) {
+      last.changes.push({
+        id: row.id,
+        fieldName: row.fieldName,
+        oldValue: row.oldValue,
+        newValue: row.newValue
+      });
+    } else {
+      groups.push({
+        updatedAt: row.updatedAt,
+        updatedBy: row.updatedBy,
+        changes: [{
+          id: row.id,
+          fieldName: row.fieldName,
+          oldValue: row.oldValue,
+          newValue: row.newValue
+        }]
+      });
+    }
+  });
+
+  return groups;
 }
 
 module.exports = { getProfileForEdit, updateProfile, getProfileHistory };

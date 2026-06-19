@@ -161,7 +161,7 @@ async function sendAccountCreationEmail(to, details) {
   const { customerName, temporaryPassword } = details;
   const greeting = customerName ? `Hello ${customerName},` : 'Hello,';
   const subject = 'Welcome to OHCTECH — Your Account Details';
-  const loginUrl = env.clientUrl || 'http://localhost:5173';
+  const loginUrl = env.portalUrl;
 
   const text = `${greeting}\n\nYour account has been successfully created. You can now log in using your email and the temporary password provided below.\n\nEmail: ${to}\nTemporary Password: ${temporaryPassword}\n\nLogin here: ${loginUrl}\n\nRegards,\nOHCTECH Support`;
 

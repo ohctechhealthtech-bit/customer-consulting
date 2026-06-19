@@ -230,23 +230,27 @@ export async function updateProfile(
   return json.data;
 }
 
-export type ProfileHistoryRecord = {
+export type ProfileChange = {
   id: number;
   fieldName: string;
   oldValue: string | null;
   newValue: string | null;
-  updatedBy: string;
+};
+
+export type ProfileUpdateGroup = {
   updatedAt: string;
+  updatedBy: string;
+  changes: ProfileChange[];
 };
 
 /** GET /api/portal/profile/history */
 export async function fetchProfileHistory(
   token: string,
-): Promise<ProfileHistoryRecord[]> {
+): Promise<ProfileUpdateGroup[]> {
   const res = await fetch(`${API_URL}/api/portal/profile/history`, {
     headers: { Authorization: `Bearer ${token}` },
   });
-  const json: ApiResponse<ProfileHistoryRecord[]> = await res.json();
+  const json: ApiResponse<ProfileUpdateGroup[]> = await res.json();
   if (!res.ok || !json.success || !json.data) {
     throw new Error(json.message || "Failed to fetch profile history");
   }
