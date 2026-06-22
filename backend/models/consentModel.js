@@ -27,18 +27,18 @@ const consentModel = {
 
   async findById(id) {
     const [rows] = await pool.query(
-      'SELECT * FROM customer_consent WHERE id = :id LIMIT 1',
+      'SELECT cc.*, cm.email FROM customer_consent cc INNER JOIN customer_master cm ON cm.id = cc.customer_id WHERE cc.id = :id LIMIT 1',
       { id },
     );
-    return rows[0] || null;
+    return rows[0] ? formatConsentRow(rows[0]) : null;
   },
 
   async findByCustomerId(customerId) {
     const [rows] = await pool.query(
-      'SELECT * FROM customer_consent WHERE customer_id = :customerId ORDER BY submitted_at DESC LIMIT 1',
+      'SELECT cc.*, cm.email FROM customer_consent cc INNER JOIN customer_master cm ON cm.id = cc.customer_id WHERE cc.customer_id = :customerId ORDER BY cc.submitted_at DESC, cc.id DESC LIMIT 1',
       { customerId },
     );
-    return rows[0] || null;
+    return rows[0] ? formatConsentRow(rows[0]) : null;
   },
 
   async getHistoryByCustomerId(customerId) {

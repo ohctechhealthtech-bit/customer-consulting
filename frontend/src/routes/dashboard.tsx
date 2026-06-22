@@ -96,7 +96,7 @@ export const Route = createFileRoute("/dashboard")({
 type PortalDashboardData = {
   profile?: ProfileData;
   consent?: {
-    current?: { consent_status: string };
+    current?: { consentStatus: string };
     history?: { id: number; action: string; performed_at: string }[];
   };
   logins?: { id: number; login_time: string; browser: string; device_type: string }[];
@@ -110,6 +110,9 @@ function PatientDashboard() {
   const [profileHistory, setProfileHistory] = useState<ProfileUpdateGroup[]>([]);
   const [updating, setUpdating] = useState(false);
   const [activeSection, setActiveSection] = useState("dashboard");
+  const [isWithdrawModalOpen, setIsWithdrawModalOpen] = useState(false);
+  const [withdrawing, setWithdrawing] = useState(false);
+  const [granting, setGranting] = useState(false);
 
   const { profile: rawProfile, consent, logins } = data || {};
 
@@ -248,6 +251,69 @@ function PatientDashboard() {
     }
   };
 
+  const handleWithdrawConsent = async () => {
+    const s = getSession();
+    if (!s?.token) return;
+
+    setWithdrawing(true);
+    try {
+      const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000";
+      const res = await fetch(`${API_URL}/api/consent`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${s.token}`,
+        },
+        body: JSON.stringify({ action: "WITHDRAW" }),
+      });
+      
+      const json = await res.json();
+      if (json.success) {
+        toast.success("Consent withdrawn successfully. Your personal data has been purged.");
+        setIsWithdrawModalOpen(false);
+        // Refresh all data to show updated state
+        await loadAllData(s.token);
+      } else {
+        throw new Error(json.message || "Failed to withdraw consent");
+      }
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to withdraw consent");
+    } finally {
+      setWithdrawing(false);
+    }
+  };
+
+  const handleGrantConsent = async () => {
+    const s = getSession();
+    if (!s?.token) return;
+
+    setGranting(true);
+    try {
+      const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000";
+      const res = await fetch(`${API_URL}/api/consent`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${s.token}`,
+        },
+        body: JSON.stringify({ action: "ACCEPT" }),
+      });
+      
+      const json = await res.json();
+      if (json.success) {
+        toast.success("Consent granted! Your data processing authorization has been restored.");
+        // Refresh all data to show updated state
+        await loadAllData(s.token);
+      } else {
+        throw new Error(json.message || "Failed to grant consent");
+      }
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to grant consent");
+    } finally {
+      setGranting(false);
+    }
+  };
+
   const scrollToSection = (id: string) => {
     const el = document.getElementById(id);
     if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
@@ -376,20 +442,44 @@ function PatientDashboard() {
             <section id="dashboard" className="space-y-4 pt-8 scroll-mt-6">
               <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
                 {[
-                  { label: "CONSENT STATUS", value: consent?.current?.consent_status || "Active", icon: ShieldCheck, color: "teal" },
-                  { label: "PROFILE UPDATED", value: "6/19/2026", icon: History, color: "blue" },
-                  { label: "ACTIVITY COUNT", value: "7 Edits", icon: Edit2, color: "slate" },
-                  { label: "RECENT LOGIN", value: "6/22/2026", icon: LogIn, color: "teal" }
+                  { 
+                    label: "CONSENT STATUS", 
+                    value: consent?.current?.consentStatus === 'allow' ? 'Granted' : (consent?.current?.consentStatus === 'withdrawn' || consent?.current?.consentStatus === 'deny') ? 'Rejected' : 'Pending', 
+                    icon: ShieldCheck, 
+                    color: (consent?.current?.consentStatus === 'withdrawn' || consent?.current?.consentStatus === 'deny') ? 'rose' : consent?.current?.consentStatus === 'allow' ? 'teal' : 'slate' 
+                  },
+                  { 
+                    label: "PROFILE UPDATED", 
+                    value: profileHistory?.[0]?.updatedAt 
+                      ? new Date(profileHistory[0].updatedAt).toLocaleDateString() 
+                      : "Never", 
+                    icon: History, 
+                    color: "blue" 
+                  },
+                  { 
+                    label: "ACTIVITY COUNT", 
+                    value: `${profileHistory?.length || 0} Edits`, 
+                    icon: Edit2, 
+                    color: "slate" 
+                  },
+                  { 
+                    label: "RECENT LOGIN", 
+                    value: logins?.[0]?.login_time 
+                      ? new Date(logins[0].login_time).toLocaleDateString() 
+                      : "N/A", 
+                    icon: LogIn, 
+                    color: "teal" 
+                  }
                 ].map((stat, i) => (
                   <Card key={i} className="rounded-2xl border border-slate-200 bg-white p-5 shadow-[0_2px_4px_rgba(0,0,0,0.02)]">
                     <div className="flex items-start justify-between">
                       <div className="space-y-1">
                         <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-[0.1em]">{stat.label}</p>
-                        <h3 className={`text-[22px] font-semibold tracking-tight ${stat.label === 'CONSENT STATUS' ? 'text-[#0d9488]' : 'text-[#1e293b]'}`}>
-                          {stat.label === 'CONSENT STATUS' && stat.value === 'allow' ? 'Active' : stat.value}
+                        <h3 className={`text-[22px] font-semibold tracking-tight ${stat.label === 'CONSENT STATUS' ? (stat.color === 'rose' ? 'text-rose-500' : stat.color === 'teal' ? 'text-[#0d9488]' : 'text-slate-500') : 'text-[#1e293b]'}`}>
+                          {stat.value}
                         </h3>
                       </div>
-                      <div className={`grid h-10 w-10 shrink-0 place-items-center rounded-xl ${stat.color === 'teal' ? 'bg-[#f0fdfa] text-[#0d9488]' : stat.color === 'blue' ? 'bg-[#eff6ff] text-[#2563eb]' : 'bg-[#f8fafc] text-slate-400 border border-slate-100'}`}>
+                      <div className={`grid h-10 w-10 shrink-0 place-items-center rounded-xl ${stat.color === 'teal' ? 'bg-[#f0fdfa] text-[#0d9488]' : stat.color === 'rose' ? 'bg-rose-50 text-rose-500' : stat.color === 'blue' ? 'bg-[#eff6ff] text-[#2563eb]' : 'bg-[#f8fafc] text-slate-400 border border-slate-100'}`}>
                         <stat.icon className="h-5 w-5" />
                       </div>
                     </div>
@@ -406,26 +496,46 @@ function PatientDashboard() {
                           <div className={`grid h-[60px] w-[60px] shrink-0 place-items-center rounded-2xl bg-[#ccfbf1] text-[#0d9488]`}>
                             <BadgeCheck className="h-8 w-8" />
                           </div>
-                          <div className="min-w-0">
+                           <div className="min-w-0">
                             <div className="text-[11px] font-bold text-slate-400 uppercase tracking-[0.15em] mb-1">HEALTH INFORMATION CONSENT</div>
                             <div className="flex items-center gap-2">
                               <span className={`text-[21px] font-medium tracking-tight text-[#1e293b]`}>
-                                Consent Granted
+                                {consent?.current?.consentStatus === 'allow' ? 'Consent Granted' : (consent?.current?.consentStatus === 'withdrawn' || consent?.current?.consentStatus === 'deny') ? 'Consent Rejected' : 'Consent Pending'}
                               </span>
-                              <div className="h-2 w-2 rounded-full bg-[#14b8a6] animate-pulse" />
+                              <div className={`h-2 w-2 rounded-full ${(consent?.current?.consentStatus === 'withdrawn' || consent?.current?.consentStatus === 'deny') ? 'bg-rose-500' : consent?.current?.consentStatus === 'allow' ? 'bg-[#14b8a6] animate-pulse' : 'bg-slate-300'}`} />
                             </div>
                             <p className="text-[14px] text-slate-500 font-medium mt-1 leading-relaxed">
-                              Authorized to store and process data for healthcare services.
+                              {consent?.current?.consentStatus === 'allow' 
+                                ? 'Authorized to store and process data for healthcare services.' 
+                                : (consent?.current?.consentStatus === 'withdrawn' || consent?.current?.consentStatus === 'deny')
+                                  ? 'Authorization revoked. Your data has been purged from active systems.'
+                                  : 'Consent is required to proceed with healthcare data storage.'}
                             </p>
                           </div>
                         </div>
                         <div className="shrink-0">
-                          <BrandButton
-                            variant="outline"
-                            className="h-10 px-5 text-[12px] font-semibold text-[#0d9488] border-[#bdfef0] hover:bg-[#f0fdfa] rounded-xl transition-all"
-                          >
-                            Withdraw Consent
-                          </BrandButton>
+                          {consent?.current?.consentStatus !== 'allow' ? (
+                            <BrandButton
+                              onClick={handleGrantConsent}
+                              disabled={granting}
+                              className="h-10 px-6 bg-[#14b8a6] hover:bg-[#0d9488] text-white rounded-xl shadow-lg shadow-teal-100 transition-all font-bold text-[12px]"
+                            >
+                              {granting ? (
+                                <div className="flex items-center gap-2">
+                                  <Clock className="h-4 w-4 animate-spin" />
+                                  GRANTING...
+                                </div>
+                              ) : "Grant Consent"}
+                            </BrandButton>
+                          ) : (
+                            <BrandButton
+                              variant="outline"
+                              onClick={() => setIsWithdrawModalOpen(true)}
+                              className="h-10 px-5 text-[12px] font-semibold text-[#0d9488] border-[#bdfef0] hover:bg-[#f0fdfa] rounded-xl transition-all"
+                            >
+                              Withdraw Consent
+                            </BrandButton>
+                          )}
                         </div>
                       </div>
                     </CardContent>
@@ -819,6 +929,51 @@ function PatientDashboard() {
                 </DialogFooter>
               </form>
             </Form>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Consent Withdrawal Confirmation Modal */}
+      <Dialog open={isWithdrawModalOpen} onOpenChange={setIsWithdrawModalOpen}>
+        <DialogContent className="sm:max-w-[480px] rounded-3xl p-0 border-none shadow-2xl">
+          <div className="p-8">
+            <DialogHeader className="mb-6">
+              <div className="h-14 w-14 rounded-2xl bg-rose-50 text-rose-500 flex items-center justify-center mb-4">
+                <AlertCircle size={28} />
+              </div>
+              <DialogTitle className="text-2xl font-bold text-slate-900 leading-tight">
+                Withdraw Consent?
+              </DialogTitle>
+              <div className="text-slate-500 font-medium mt-2 leading-relaxed">
+                This action will revoke our authorization to process your health data. 
+                <span className="text-rose-600 font-bold block mt-2">
+                  Warning: All your personal information will be permanently purged from our active systems.
+                </span>
+              </div>
+            </DialogHeader>
+            
+            <div className="flex flex-col gap-3">
+              <BrandButton 
+                onClick={handleWithdrawConsent}
+                disabled={withdrawing}
+                className="w-full h-12 bg-rose-500 hover:bg-rose-600 text-white rounded-xl font-bold text-[15px] shadow-lg shadow-rose-200"
+              >
+                {withdrawing ? (
+                  <div className="flex items-center gap-2">
+                    <Clock className="h-4 w-4 animate-spin" />
+                    WITHDRAWING...
+                  </div>
+                ) : "YES, WITHDRAW AND PURGE DATA"}
+              </BrandButton>
+              <BrandButton 
+                variant="outline"
+                onClick={() => setIsWithdrawModalOpen(false)}
+                disabled={withdrawing}
+                className="w-full h-12 border-slate-200 text-slate-600 hover:bg-slate-50 rounded-xl font-bold text-[15px]"
+              >
+                CANCEL
+              </BrandButton>
+            </div>
           </div>
         </DialogContent>
       </Dialog>

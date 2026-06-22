@@ -235,7 +235,7 @@ const customerModel = {
        INNER JOIN customer_consent cc ON cc.customer_id = cm.id
        LEFT JOIN company_master com ON com.id = cm.company_id
        WHERE cm.id = :customerId
-       ORDER BY cc.submitted_at DESC
+       ORDER BY cc.submitted_at DESC, cc.id DESC
        LIMIT 1`,
       { customerId },
     );
@@ -261,7 +261,7 @@ const customerModel = {
       age: customer.age || null,
       companyName: customer.companyName || null,
       employeeCode: customer.employeeCode || null,
-      consent: customer.consentStatus === 'allow' ? 'Accepted' : 'Rejected',
+      consent: customer.consentStatus === 'allow' ? 'Accepted' : customer.consentStatus === 'withdrawn' ? 'Withdrawn' : 'Rejected',
       submittedAt: customer.submittedAt ? new Date(customer.submittedAt).toISOString() : null,
       responses: responses.map((r) => ({
         questionKey: r.questionKey,

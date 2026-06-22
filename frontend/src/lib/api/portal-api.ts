@@ -191,6 +191,7 @@ export type ProfileData = {
   email: string;
   firstName: string | null;
   lastName: string | null;
+  name?: string | null;
   mobile: string | null;
   age: number | null;
   companyId: number | null;
