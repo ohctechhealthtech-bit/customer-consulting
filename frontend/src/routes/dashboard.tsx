@@ -18,18 +18,21 @@ import {
   AlertCircle,
   Activity,
   Check,
+  LayoutDashboard,
+  Share2,
+  Lock,
 } from "lucide-react";
 import {
   LineChart,
   Line,
   XAxis,
   YAxis,
-  CartesianGrid,
   Tooltip,
   ResponsiveContainer,
   AreaChart,
   Area,
   Legend,
+  CartesianGrid as RechartsCartesianGrid,
 } from "recharts";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -106,8 +109,24 @@ function PatientDashboard() {
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [profileHistory, setProfileHistory] = useState<ProfileUpdateGroup[]>([]);
   const [updating, setUpdating] = useState(false);
+  const [activeSection, setActiveSection] = useState("dashboard");
 
-  const { profile, consent, logins } = data || {};
+  const { profile: rawProfile, consent, logins } = data || {};
+
+  // Normalize name for display if firstName/lastName are missing (handle backend object structure)
+  const profile = useMemo(() => {
+    if (!rawProfile) return null;
+    if (rawProfile.firstName) return rawProfile;
+
+    // Split full name if only 'name' field exists
+    const full = rawProfile.name || "";
+    const parts = full.trim().split(/\s+/);
+    return {
+      ...rawProfile,
+      firstName: parts[0] || "",
+      lastName: parts.slice(1).join(" ") || ""
+    };
+  }, [rawProfile]);
 
   const chartData = useMemo(() => {
     // Last 30 days map
@@ -173,7 +192,29 @@ function PatientDashboard() {
     }
 
     loadAllData(s.token);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+
+    const observerOptions = {
+      root: null,
+      rootMargin: "-20% 0px -70% 0px",
+      threshold: 0,
+    };
+
+    const observerCallback = (entries: IntersectionObserverEntry[]) => {
+      entries.forEach((entry) => {
+        if (entry.isIntersecting) {
+          setActiveSection(entry.target.id);
+        }
+      });
+    };
+
+    const observer = new IntersectionObserver(observerCallback, observerOptions);
+    const sections = ["dashboard", "profile", "access-log", "history", "insights"];
+    sections.forEach((id) => {
+      const el = document.getElementById(id);
+      if (el) observer.observe(el);
+    });
+
+    return () => observer.disconnect();
   }, []);
 
   const loadAllData = async (token: string) => {
@@ -192,11 +233,7 @@ function PatientDashboard() {
         headers: { Authorization: `Bearer ${token}` },
       });
       const json = await res.json();
-      if (json.success) {
-        setData(json.data);
-      } else {
-        throw new Error(json.message);
-      }
+      if (json.success) setData(json.data);
     } catch (err) {
       toast.error("Failed to load dashboard data");
     }
@@ -211,26 +248,25 @@ function PatientDashboard() {
     }
   };
 
-  const handleLogout = () => {
-    clearSession();
-    navigate({ to: "/" });
+  const scrollToSection = (id: string) => {
+    const el = document.getElementById(id);
+    if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
   };
 
   const handleEditClick = async () => {
     const s = getSession();
     if (!s.token) return;
-
     try {
       setUpdating(true);
-      const profile = await fetchProfile(s.token);
+      const profileData = await fetchProfile(s.token);
       form.reset({
-        firstName: profile.firstName || "",
-        lastName: profile.lastName || "",
-        email: profile.email || "",
-        mobile: profile.mobile || "",
-        age: profile.age || 0,
-        companyName: profile.companyName || "",
-        employeeCode: profile.employeeCode || "",
+        firstName: profileData.firstName || "",
+        lastName: profileData.lastName || "",
+        email: profileData.email || "",
+        mobile: profileData.mobile || "",
+        age: profileData.age || 0,
+        companyName: profileData.companyName || "",
+        employeeCode: profileData.employeeCode || "",
       });
       setIsEditModalOpen(true);
     } catch (err) {
@@ -243,17 +279,11 @@ function PatientDashboard() {
   const onProfileSubmit = async (values: ProfileFormValues) => {
     const s = getSession();
     if (!s.token) return;
-
     setUpdating(true);
     try {
       const result = await updateProfile(values, s.token);
       toast.success(result.message || "Profile updated successfully");
-
-      // If email was changed, update local session
-      if (values.email !== s.email) {
-        setSession({ email: values.email });
-      }
-
+      if (values.email !== s.email) setSession({ email: values.email });
       setIsEditModalOpen(false);
       await loadAllData(s.token);
     } catch (err) {
@@ -263,38 +293,9 @@ function PatientDashboard() {
     }
   };
 
-  const handleConsentAction = async (action: "WITHDRAW" | "ACCEPT") => {
-    try {
-      setLoading(true);
-      const s = getSession();
-      const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000";
-      const res = await fetch(`${API_URL}/api/consent`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${s.token}`,
-        },
-        body: JSON.stringify({ action }),
-      });
-      const json = await res.json();
-      if (json.success) {
-        toast.success(
-          action === "ACCEPT" ? "Consent granted successfully" : "Consent withdrawn successfully",
-        );
-        await fetchDashboardData(s.token!);
-      } else {
-        throw new Error(json.message);
-      }
-    } catch (err) {
-      toast.error("Failed to update consent");
-    } finally {
-      setLoading(false);
-    }
-  };
-
   if (loading && !data) {
     return (
-      <PortalShell>
+      <PortalShell hideHeader={true} className="w-full px-4 pt-4 pb-12 sm:px-8">
         <div className="flex min-h-[60vh] items-center justify-center">
           <Clock className="h-8 w-8 animate-spin text-slate-400" />
         </div>
@@ -302,294 +303,296 @@ function PatientDashboard() {
     );
   }
 
-  const status = consent?.current?.consent_status;
-  const isAccepted = status === "allow";
-
   return (
     <>
-      <PortalShell>
-        <div className="space-y-6 pb-12">
-          {/* Header Section */}
-          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between px-1">
-            <div className="min-w-0">
-              <h1 className="text-2xl font-bold tracking-tight text-foreground">Patient Portal</h1>
-              <p className="text-[13px] text-muted-foreground font-medium mt-0.5">
-                Welcome back, {[profile?.firstName, profile?.lastName].filter(Boolean).join(" ") || "Guest"}
-              </p>
-            </div>
-            <BrandButton
-              variant="outline"
-              onClick={handleLogout}
-              className="h-10 px-4 text-xs font-semibold"
-            >
-              <LogOut className="mr-2 h-3.5 w-3.5" /> Sign Out
-            </BrandButton>
+      <div className="fixed left-0 top-0 hidden h-screen w-72 flex-col border-r border-slate-200 bg-white lg:flex z-50">
+        <div className="flex shrink-0 flex-col px-8 pt-10 pb-10">
+          <div className="mb-0 px-0">
+            <img src="/ohctech-logo.png" alt="OHCTECH" className="h-12 w-auto object-contain" />
+            <div className="mt-5 text-[13px] font-semibold uppercase tracking-[0.22em] text-slate-400 pl-1">CONSENT PORTAL</div>
           </div>
-          {/* Statistics Summary Row */}
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-            <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-              <div className="flex items-start justify-between gap-3">
-                <div className="min-w-0">
-                  <div className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider">
-                    Consent status
-                  </div>
-                  <div
-                    className={`mt-1 text-xl font-bold tracking-tight ${isAccepted ? "text-emerald-600" : "text-amber-600"}`}
-                  >
-                    {isAccepted ? "Active" : status === "withdrawn" ? "Withdrawn" : "Missing"}
-                  </div>
-                </div>
-                <div
-                  className={`grid h-10 w-10 shrink-0 place-items-center rounded-lg ${isAccepted ? "bg-emerald-50 text-emerald-600" : "bg-amber-50 text-amber-600"}`}
-                >
-                  {isAccepted ? (
-                    <ShieldCheck className="h-5 w-5" />
-                  ) : (
-                    <XCircle className="h-5 w-5" />
-                  )}
-                </div>
-              </div>
-            </div>
+        </div>
 
-            <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-              <div className="flex items-start justify-between gap-3">
-                <div className="min-w-0">
-                  <div className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider">
-                    Profile updated
-                  </div>
-                  <div className="mt-1 text-xl font-bold tracking-tight text-foreground">
-                    {profileHistory[0]
-                      ? new Date(profileHistory[0].updatedAt).toLocaleDateString()
-                      : "Initial"}
-                  </div>
-                </div>
-                <div className="grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-blue-50 text-blue-600">
-                  <History className="h-5 w-5" />
-                </div>
-              </div>
-            </div>
+        <nav className="flex-1 space-y-1.5 px-4 overflow-y-auto custom-scrollbar pt-2">
+          {[
+            { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
+            { id: 'profile', label: 'Personal Profile', icon: User },
+            { id: 'access-log', label: 'Access Log', icon: ShieldCheck },
+            { id: 'history', label: 'Activity History', icon: History },
+            { id: 'insights', label: 'Activity Insights', icon: Activity }
+          ].map((item) => (
+            <button
+              key={item.id}
+              onClick={() => scrollToSection(item.id)}
+              className={`flex w-full items-center gap-3.5 px-4 py-3 rounded-xl text-[14px] font-semibold transition-all duration-200 ${activeSection === item.id
+                  ? 'bg-[#f0fdfa] text-[#0d9488] shadow-sm'
+                  : 'text-slate-500 hover:bg-slate-50 hover:text-slate-700'
+                }`}
+            >
+              <item.icon size={20} className={activeSection === item.id ? 'text-[#0d9488]' : 'text-slate-400'} />
+              {item.label}
+            </button>
+          ))}
+        </nav>
 
-            <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-              <div className="flex items-start justify-between gap-3">
-                <div className="min-w-0">
-                  <div className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider">
-                    Activity count
-                  </div>
-                  <div className="mt-1 text-xl font-bold tracking-tight text-foreground">
-                    {profileHistory.length} Edits
-                  </div>
-                </div>
-                <div className="grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-slate-50 text-slate-400 border border-slate-100">
-                  <Edit2 className="h-5 w-5" />
-                </div>
-              </div>
+        <div className="mt-auto px-4 pb-4">
+          <button
+            onClick={() => { clearSession(); navigate({ to: "/" }); }}
+            className="flex w-full items-center gap-3.5 rounded-xl px-4 py-3 text-sm font-semibold text-rose-500 hover:bg-rose-50 transition-all duration-200 group"
+          >
+            <div className="grid h-9 w-9 place-items-center rounded-xl bg-transparent border border-rose-100 text-rose-500 group-hover:bg-rose-50 transition-colors">
+              <LogOut size={16} />
             </div>
+            Sign Out
+          </button>
+        </div>
+      </div>
 
-            <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-              <div className="flex items-start justify-between gap-3">
-                <div className="min-w-0">
-                  <div className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider">
-                    Recent login
-                  </div>
-                  <div className="mt-1 text-xl font-bold tracking-tight text-foreground">
-                    {logins && logins[0]
-                      ? new Date(logins[0].login_time).toLocaleDateString()
-                      : "Just now"}
-                  </div>
+      <PortalShell hideHeader={true} className="w-full px-4 pt-10 pb-12 sm:px-8 lg:pl-80">
+        <div className="mx-auto max-w-7xl pt-1">
+          <div className="mb-0 flex items-center justify-between px-1 py-0.5">
+            <div>
+              <h1 className="text-[30px] font-bold tracking-tight text-[#1e293b]">Patient Portal</h1>
+              <p className="text-[16px] text-slate-500 font-medium mt-1">Welcome back, <span className="text-[#14b8a6] font-semibold">{profile?.firstName || 'User'}</span></p>
+            </div>
+            <div className="flex items-center gap-4">
+              <button className="grid h-10 w-10 place-items-center rounded-xl bg-white border border-slate-200 text-slate-400 hover:text-[#0d9488] transition-colors relative">
+                <ShieldCheck className="h-5 w-5" />
+                <div className="absolute top-2 right-2 h-2 w-2 rounded-full bg-emerald-500 border-2 border-white" />
+              </button>
+              <div className="flex items-center gap-4 bg-white border border-slate-200 pl-2 pr-6 py-1.5 rounded-2xl shadow-sm min-w-[200px]">
+                <div className="h-8 w-8 rounded-xl bg-[#f0fdfa] border border-[#ccfbf1] text-[#0d9488] font-bold text-[11px] flex items-center justify-center shrink-0">
+                  {profile?.firstName?.charAt(0) || "U"}
                 </div>
-                <div className="grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-emerald-50 text-emerald-600">
-                  <LogIn className="h-5 w-5" />
+                <div className="text-left leading-tight truncate">
+                  <p className="text-[13px] font-semibold text-[#1e293b] truncate">{profile?.firstName} {profile?.lastName}</p>
+                  <p className="text-[10px] text-slate-400 font-medium uppercase mt-0.5">Patient Profile</p>
                 </div>
               </div>
             </div>
-          </div>{" "}
-          <div className="grid gap-6">
-            {/* Row 2: Consent & Security */}
-            <div className="grid gap-6 lg:grid-cols-10">
-              <div className="lg:col-span-7">
-                <Card className="rounded-xl border border-slate-200 bg-white shadow-sm overflow-hidden h-full">
-                  <div className={`h-1 w-full ${isAccepted ? "bg-emerald-500" : "bg-amber-500"}`} />
-                  <CardContent className="p-6">
-                    <div className="flex items-center justify-between gap-6">
-                      <div className="flex items-center gap-5 min-w-0">
-                        <div
-                          className={`grid h-12 w-12 shrink-0 place-items-center rounded-xl ${isAccepted ? "bg-emerald-50 text-emerald-600" : "bg-amber-50 text-amber-500"}`}
-                        >
-                          {isAccepted ? (
-                            <BadgeCheck className="h-7 w-7" />
-                          ) : (
-                            <XCircle className="h-7 w-7" />
-                          )}
-                        </div>
-                        <div className="min-w-0">
-                          <div className="text-[11px] font-bold text-muted-foreground uppercase tracking-[0.12em] leading-none mb-2">
-                            Health Information Consent
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <span
-                              className={`text-xl font-bold tracking-tight ${isAccepted ? "text-slate-800" : "text-amber-700"}`}
-                            >
-                              {isAccepted
-                                ? "Consent Granted"
-                                : status === "withdrawn"
-                                  ? "Withdrawn"
-                                  : "Not Granted"}
-                            </span>
-                          </div>
-                          <p className="text-[13px] text-slate-500 font-medium leading-none mt-2 truncate">
-                            {isAccepted
-                              ? "Authorized to store and process data for healthcare services."
-                              : "Data processing is currently limited or restricted."}
-                          </p>
-                        </div>
+          </div>
+
+          <div className="space-y-10">
+            <section id="dashboard" className="space-y-4 pt-8 scroll-mt-6">
+              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                {[
+                  { label: "CONSENT STATUS", value: consent?.current?.consent_status || "Active", icon: ShieldCheck, color: "teal" },
+                  { label: "PROFILE UPDATED", value: "6/19/2026", icon: History, color: "blue" },
+                  { label: "ACTIVITY COUNT", value: "7 Edits", icon: Edit2, color: "slate" },
+                  { label: "RECENT LOGIN", value: "6/22/2026", icon: LogIn, color: "teal" }
+                ].map((stat, i) => (
+                  <Card key={i} className="rounded-2xl border border-slate-200 bg-white p-5 shadow-[0_2px_4px_rgba(0,0,0,0.02)]">
+                    <div className="flex items-start justify-between">
+                      <div className="space-y-1">
+                        <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-[0.1em]">{stat.label}</p>
+                        <h3 className={`text-[22px] font-semibold tracking-tight ${stat.label === 'CONSENT STATUS' ? 'text-[#0d9488]' : 'text-[#1e293b]'}`}>
+                          {stat.label === 'CONSENT STATUS' && stat.value === 'allow' ? 'Active' : stat.value}
+                        </h3>
                       </div>
-                      <div className="shrink-0">
-                        {isAccepted ? (
+                      <div className={`grid h-10 w-10 shrink-0 place-items-center rounded-xl ${stat.color === 'teal' ? 'bg-[#f0fdfa] text-[#0d9488]' : stat.color === 'blue' ? 'bg-[#eff6ff] text-[#2563eb]' : 'bg-[#f8fafc] text-slate-400 border border-slate-100'}`}>
+                        <stat.icon className="h-5 w-5" />
+                      </div>
+                    </div>
+                  </Card>
+                ))}
+              </div>
+
+              <div className="grid gap-6 lg:grid-cols-12">
+                <div className="lg:col-span-8">
+                  <Card className="rounded-[20px] border border-slate-200 bg-white shadow-[0_2px_4px_rgba(0,0,0,0.02)] overflow-hidden">
+                    <CardContent className="p-7">
+                      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-6">
+                        <div className="flex items-center gap-6 min-w-0">
+                          <div className={`grid h-[60px] w-[60px] shrink-0 place-items-center rounded-2xl bg-[#ccfbf1] text-[#0d9488]`}>
+                            <BadgeCheck className="h-8 w-8" />
+                          </div>
+                          <div className="min-w-0">
+                            <div className="text-[11px] font-bold text-slate-400 uppercase tracking-[0.15em] mb-1">HEALTH INFORMATION CONSENT</div>
+                            <div className="flex items-center gap-2">
+                              <span className={`text-[21px] font-medium tracking-tight text-[#1e293b]`}>
+                                Consent Granted
+                              </span>
+                              <div className="h-2 w-2 rounded-full bg-[#14b8a6] animate-pulse" />
+                            </div>
+                            <p className="text-[14px] text-slate-500 font-medium mt-1 leading-relaxed">
+                              Authorized to store and process data for healthcare services.
+                            </p>
+                          </div>
+                        </div>
+                        <div className="shrink-0">
                           <BrandButton
                             variant="outline"
-                            onClick={() => handleConsentAction("WITHDRAW")}
-                            className="h-10 px-5 text-[11px] font-bold text-amber-600 border-amber-200 hover:bg-amber-50"
+                            className="h-10 px-5 text-[12px] font-semibold text-[#0d9488] border-[#bdfef0] hover:bg-[#f0fdfa] rounded-xl transition-all"
                           >
                             Withdraw Consent
                           </BrandButton>
-                        ) : (
-                          <BrandButton
-                            onClick={() => handleConsentAction("ACCEPT")}
-                            className="h-10 px-6 text-[11px] font-bold"
-                          >
-                            Grant Consent
-                          </BrandButton>
-                        )}
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              </div>
-              <div className="lg:col-span-3">
-                <Card className="rounded-xl border border-slate-200 bg-white shadow-sm h-full">
-                  <CardHeader className="border-b border-slate-100 px-6 py-4">
-                    <CardTitle className="flex items-center gap-2 text-sm font-semibold">
-                      <Settings className="h-4 w-4 text-emerald-600" /> Account Security
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent className="p-5">
-                    <button
-                      onClick={() => navigate({ to: "/change-password" })}
-                      className="flex w-full items-center justify-between rounded-xl border border-slate-100 bg-slate-50 p-4 hover:bg-slate-100 transition-colors group"
-                    >
-                      <div className="text-left">
-                        <p className="text-sm font-bold text-slate-700">Change Password</p>
-                        <p className="text-[11px] text-muted-foreground font-medium">
-                          Update account credentials
-                        </p>
-                      </div>
-                      <ChevronRight
-                        size={16}
-                        className="text-slate-400 group-hover:text-emerald-600 transition-all group-hover:translate-x-0.5"
-                      />
-                    </button>
-                  </CardContent>
-                </Card>
-              </div>
-            </div>
-
-            {/* Row 3: Profile & Access Log */}
-            <div className="grid gap-6 lg:grid-cols-10">
-              <div className="lg:col-span-7">
-                <Card className="rounded-xl border border-slate-200 bg-white shadow-sm overflow-hidden h-full">
-                  <CardHeader className="border-b border-slate-100 flex flex-row items-center justify-between px-6 py-4">
-                    <CardTitle className="flex items-center gap-2 text-sm font-semibold text-slate-800">
-                      <User className="h-4 w-4 text-emerald-600" /> Personal Profile
-                    </CardTitle>
-                    <BrandButton
-                      variant="outline"
-                      size="sm"
-                      onClick={handleEditClick}
-                      disabled={updating}
-                      className="h-8 px-4 text-[11px] font-bold"
-                    >
-                      <Edit2 className="mr-2 h-3.5 w-3.5" /> Edit Profile
-                    </BrandButton>
-                  </CardHeader>
-                  <CardContent className="p-6">
-                    <dl className="grid gap-x-12 gap-y-6 sm:grid-cols-2">
-                      <div className="space-y-1">
-                        <dt className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider">
-                          Full Name
-                        </dt>
-                        <dd className="text-sm font-semibold text-slate-700">
-                          {[profile?.firstName, profile?.lastName].filter(Boolean).join(" ") || "—"}
-                        </dd>
-                      </div>
-                      <div className="space-y-1">
-                        <dt className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider">
-                          Email Address
-                        </dt>
-                        <dd className="text-sm font-semibold text-slate-700">{profile?.email}</dd>
-                      </div>
-                      <div className="space-y-1">
-                        <dt className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider">
-                          Mobile Number
-                        </dt>
-                        <dd className="text-sm font-semibold text-slate-700">
-                          {profile?.mobile || "—"}
-                        </dd>
-                      </div>
-                      <div className="space-y-1">
-                        <dt className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider">
-                          Age
-                        </dt>
-                        <dd className="text-sm font-semibold text-slate-700">
-                          {profile?.age || "—"} Years
-                        </dd>
-                      </div>
-                      <div className="sm:col-span-2 mt-2 pt-6 border-t border-slate-50">
-                        <div className="flex items-center gap-4 p-4 bg-slate-50/50 rounded-xl border border-slate-100">
-                          <div className="grid h-10 w-10 place-items-center rounded-lg bg-white border border-slate-100 text-slate-400">
-                            <Building2 className="h-5 w-5" />
-                          </div>
-                          <div>
-                            <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest block mb-0.5">
-                              Employment Verified
-                            </span>
-                            <span className="text-sm font-bold text-slate-700">
-                              {profile?.companyName || "No Company Specified"}{" "}
-                              {profile?.employeeCode ? `[${profile?.employeeCode}]` : ""}
-                            </span>
-                          </div>
                         </div>
                       </div>
+                    </CardContent>
+                  </Card>
+                </div>
+                <div className="lg:col-span-4">
+                  <Card className="rounded-[20px] border border-slate-200 bg-white h-full shadow-[0_2px_4px_rgba(0,0,0,0.02)] overflow-hidden">
+                    <CardHeader className="px-6 py-4 border-b border-slate-100 bg-[#f8fafc]/30">
+                      <div className="flex items-center gap-2">
+                        <ShieldCheck className="h-4 w-4 text-[#0d9488]" />
+                        <CardTitle className="text-[10px] font-semibold text-slate-400 uppercase tracking-[0.1em]">ACCOUNT PROTECTION</CardTitle>
+                      </div>
+                    </CardHeader>
+                    <CardContent className="p-6">
+                      <div className="flex items-center justify-between p-4 rounded-xl border border-slate-100 bg-slate-50/50 group cursor-pointer hover:bg-white hover:shadow-sm transition-all">
+                        <div className="space-y-1">
+                          <p className="text-[13px] font-semibold text-[#1e293b]">Secure Password</p>
+                          <p className="text-[10px] text-slate-400 font-medium uppercase">IDENTITY MANAGEMENT</p>
+                        </div>
+                        <ChevronRight className="h-4 w-4 text-slate-300 group-hover:text-[#0d9488] transition-colors" />
+                      </div>
+                    </CardContent>
+                  </Card>
+                </div>
+              </div>
+            </section>
+
+            <section id="profile" className="space-y-6 scroll-mt-6">
+              <div className="grid gap-6 lg:grid-cols-12">
+                <Card className="lg:col-span-12 rounded-[22px] border border-slate-200 bg-white shadow-[0_2px_4px_rgba(0,0,0,0.02)] overflow-hidden">
+                  <CardHeader className="bg-[#f8fafc]/30 px-8 py-5 border-b border-slate-100">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <div className="h-10 w-10 rounded-xl bg-white border border-slate-100 flex items-center justify-center text-[#14b8a6] shadow-sm">
+                          <User size={20} />
+                        </div>
+                        <div>
+                          <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-widest">IDENTITY PROFILE</p>
+                          <p className="text-[16px] font-semibold text-[#1e293b]">Primary Information</p>
+                        </div>
+                      </div>
+                      <BrandButton variant="outline" size="sm" onClick={handleEditClick} disabled={updating} className="h-9 px-5 text-[13px] font-bold rounded-xl hover:bg-[#f0fdfa] border-[#e2e8f0] text-[#0d9488]">
+                        <Edit2 className="mr-2 h-4 w-4" /> EDIT DETAILS
+                      </BrandButton>
+                    </div>
+                  </CardHeader>
+                  <CardContent className="p-10">
+                    <dl className="grid gap-x-12 gap-y-10 sm:grid-cols-2">
+                      {[
+                        { label: 'Full Name', value: [profile?.firstName, profile?.lastName].filter(Boolean).join(' ') || '—' },
+                        { label: 'Email Address', value: profile?.email },
+                        { label: 'Mobile Number', value: profile?.mobile || '—' },
+                        { label: 'Verification Context', value: profile?.companyName || 'Private Individual' }
+                      ].map((item, idx) => (
+                        <div key={idx} className="space-y-2">
+                          <dt className="text-[11px] font-semibold text-slate-400 uppercase tracking-[0.1em]">{item.label}</dt>
+                          <dd className="text-[16px] font-semibold text-[#1e293b]">{item.value}</dd>
+                        </div>
+                      ))}
                     </dl>
                   </CardContent>
                 </Card>
               </div>
-              <div className="lg:col-span-3">
-                <Card className="rounded-xl border border-slate-200 bg-white shadow-sm overflow-hidden flex flex-col h-[350px]">
-                  <CardHeader className="border-b border-slate-100 bg-slate-50/50 px-6 py-4 sticky top-0 z-10">
-                    <CardTitle className="text-[11px] font-bold text-muted-foreground uppercase tracking-widest leading-none">
-                      Access Log
-                    </CardTitle>
+            </section>
+            <section id="access-log" className="space-y-6 scroll-mt-6">
+              <div className="grid gap-6 lg:grid-cols-12">
+                <Card className="lg:col-span-12 rounded-[22px] border border-slate-200 bg-white shadow-[0_2px_4px_rgba(0,0,0,0.02)] overflow-hidden flex flex-col h-[400px]">
+                  <CardHeader className="border-b border-slate-100 bg-[#f8fafc]/30 px-8 py-5 sticky top-0 z-10">
+                    <div className="flex items-center gap-3">
+                      <div className="h-9 w-9 rounded-xl bg-white border border-slate-100 flex items-center justify-center text-[#14b8a6] shadow-sm">
+                        <ShieldCheck size={18} />
+                      </div>
+                      <CardTitle className="text-[10px] font-semibold text-slate-400 uppercase tracking-widest leading-none">Security Access Log</CardTitle>
+                    </div>
                   </CardHeader>
-                  <CardContent className="p-0 overflow-y-auto flex-1">
+                  <CardContent className="p-0 overflow-y-auto flex-1 custom-scrollbar">
                     <div className="divide-y divide-slate-100">
                       {logins?.map((l) => (
-                        <div
-                          key={l.id}
-                          className="flex gap-4 items-center p-5 hover:bg-slate-50 transition-colors"
-                        >
-                          <div className="grid h-9 w-9 place-items-center rounded-lg bg-slate-50 border border-slate-100 text-slate-400 shrink-0">
-                            <Clock size={16} />
+                        <div key={l.id} className="flex gap-5 items-center p-6 hover:bg-[#f8fafc]/50 transition-all">
+                          <div className="grid h-10 w-10 place-items-center rounded-xl bg-white border border-slate-200 text-slate-400 shadow-sm shrink-0">
+                            <Clock size={18} />
                           </div>
                           <div className="min-w-0">
-                            <p className="text-[13px] font-bold text-slate-700 truncate">
-                              {new Date(l.login_time).toLocaleString([], {
-                                dateStyle: "medium",
-                                timeStyle: "short",
-                              })}
+                            <p className="text-[15px] font-semibold text-[#1e293b] truncate">{new Date(l.login_time).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })}</p>
+                            <p className="text-[12px] text-slate-400 font-bold uppercase tracking-tight mt-1 truncate">{l.browser || 'System'} • {l.device_type || 'PC'}</p>
+                          </div>
+                        </div>
+                      ))}
+                      {(!logins || logins.length === 0) && (
+                        <div className="p-16 text-center text-slate-400 italic text-sm col-span-full font-medium">No login attempts recorded.</div>
+                      )}
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+            </section>
+
+
+
+            <section id="history" className="space-y-6 scroll-mt-6">
+              <div className="grid gap-6 lg:grid-cols-2">
+                <Card className="rounded-[22px] border border-slate-200 bg-white shadow-sm overflow-hidden flex flex-col h-[480px]">
+                  <CardHeader className="border-b border-slate-100 flex flex-row items-center justify-between px-8 py-5 sticky top-0 z-10 bg-white">
+                    <CardTitle className="text-[10px] font-semibold text-slate-400 uppercase tracking-widest leading-none">PROFILE MODIFICATIONS</CardTitle>
+                  </CardHeader>
+                  <CardContent className="p-0 overflow-y-auto flex-1 custom-scrollbar">
+                    <div className="divide-y divide-slate-100">
+                      {profileHistory.length === 0 && (
+                        <div className="py-20 text-center text-[14px] text-slate-400 font-medium italic">No profile modifications found.</div>
+                      )}
+                      {profileHistory.map((group, idx) => (
+                        <div key={idx} className="p-7 hover:bg-[#f8fafc]/30 transition-all">
+                          <div className="flex items-center justify-between mb-6">
+                            <div className="flex items-center gap-3">
+                              <div className="h-7 w-7 rounded-lg bg-[#f0fdfa] border border-[#ccfbf1] text-[#0d9488] font-bold text-[10px] flex items-center justify-center shadow-sm">
+                                #{profileHistory.length - idx}
+                              </div>
+                              <p className="text-[13px] font-semibold text-[#1e293b]">Modification Recorded</p>
+                            </div>
+                            <p className="text-[11px] text-slate-400 font-bold uppercase tracking-tighter">
+                              {new Date(group.updatedAt).toLocaleDateString()}
                             </p>
-                            <p className="text-[11px] text-muted-foreground font-semibold truncate uppercase tracking-tighter">
-                              {l.browser || "System"} • {l.device_type || "PC"}
-                            </p>
+                          </div>
+                          <div className="space-y-5">
+                            {group.changes.map((ch: ProfileChange) => (
+                              <div key={ch.id} className="space-y-2">
+                                <div className="text-[9px] font-bold text-slate-400 uppercase tracking-[0.2em]">{ch.fieldName}</div>
+                                <div className="flex items-center gap-3">
+                                  <div className="bg-slate-50 px-3 py-1.5 rounded-lg text-slate-400 text-xs font-semibold border border-slate-100 line-through">
+                                    {ch.oldValue || "—"}
+                                  </div>
+                                  <ChevronRight size={12} className="text-slate-300" />
+                                  <div className="bg-[#f0fdfa] px-3 py-1.5 rounded-lg text-[#0d9488] text-xs font-bold border border-[#ccfbf1] shadow-sm">
+                                    {ch.newValue || "—"}
+                                  </div>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card className="rounded-[22px] border border-slate-200 bg-white shadow-[0_2px_4px_rgba(0,0,0,0.02)] overflow-hidden flex flex-col h-[480px]">
+                  <CardHeader className="border-b border-slate-100 flex flex-row items-center justify-between px-8 py-5 sticky top-0 z-10 bg-white">
+                    <CardTitle className="text-[10px] font-semibold text-slate-400 uppercase tracking-widest leading-none">CONSENT DIGITAL AUDIT</CardTitle>
+                  </CardHeader>
+                  <CardContent className="p-0 overflow-y-auto flex-1 custom-scrollbar">
+                    <div className="divide-y divide-slate-100">
+                      {(consent?.history || []).length === 0 && (
+                        <div className="py-20 text-center text-[14px] text-slate-400 font-medium italic">No activity recorded.</div>
+                      )}
+                      {consent?.history?.map((h: any) => (
+                        <div key={h.id} className="p-7 hover:bg-[#f8fafc]/30 transition-all border-l-2 border-transparent hover:border-emerald-500">
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-4">
+                              <div className={`h-10 w-10 rounded-xl flex items-center justify-center ${h.action === 'ACCEPT' ? 'bg-[#f0fdfa] text-[#0d9488] border border-[#ccfbf1]' : 'bg-rose-50 text-rose-500 border border-rose-100'}`}>
+                                {h.action === 'ACCEPT' ? <Check size={18} strokeWidth={3} /> : <XCircle size={18} strokeWidth={3} />}
+                              </div>
+                              <div>
+                                <p className="text-[14px] font-bold text-[#1e293b] leading-none tracking-tight">{h.action}</p>
+                                <p className="text-[11px] text-slate-400 font-bold mt-1.5 uppercase tracking-[0.1em]">{new Date(h.performed_at).toLocaleDateString()}</p>
+                              </div>
+                            </div>
+                            <span className="text-[9px] font-bold text-[#0d9488] bg-[#f0fdfa] px-3 py-1.5 rounded-lg border border-[#ccfbf1] uppercase tracking-widest shadow-sm">VERIFIED</span>
                           </div>
                         </div>
                       ))}
@@ -597,368 +600,226 @@ function PatientDashboard() {
                   </CardContent>
                 </Card>
               </div>
-            </div>
+            </section>
 
-            {/* Row 4: History & Audit */}
-            <div className="grid gap-6 lg:grid-cols-10">
-              <div className="lg:col-span-7">
-                <Card className="rounded-xl border border-slate-200 bg-white shadow-sm overflow-hidden flex flex-col h-[450px]">
-                  <CardHeader className="border-b border-slate-100 flex items-center justify-between px-6 py-4 sticky top-0 z-10 bg-white">
-                    <CardTitle className="flex items-center gap-2 text-sm font-semibold">
-                      <Edit2 className="h-4 w-4 text-emerald-600" /> Profile Change History
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent className="p-0 overflow-y-auto flex-1 bg-slate-50/10">
-                    <div className="divide-y divide-slate-100">
-                      {profileHistory.length === 0 && (
-                        <div className="py-20 text-center text-[13px] text-muted-foreground font-medium italic">
-                          No profile modifications found.
-                        </div>
-                      )}
-                      {profileHistory.map((group, idx) => (
-                        <div key={idx} className="p-6 hover:bg-white transition-all">
-                          <div className="max-w-2xl">
-                            <div className="flex items-center gap-3 mb-4">
-                              <div className="h-5 w-5 rounded-full bg-emerald-500 text-[10px] font-bold text-white flex items-center justify-center shadow-sm">
-                                #{profileHistory.length - idx}
-                              </div>
-                              <div>
-                                <p className="text-[11px] font-black text-slate-800 uppercase tracking-tight">
-                                  Profile Updated
-                                </p>
-                                <p className="text-[10px] text-muted-foreground font-bold uppercase tracking-widest mt-0.5">
-                                  {new Date(group.updatedAt).toLocaleString(undefined, {
-                                    dateStyle: "medium",
-                                    timeStyle: "short",
-                                  })}
-                                </p>
-                              </div>
-                            </div>
-
-                            <div className="space-y-3 pl-5 border-l border-slate-100 ml-2.5">
-                              {group.changes.map((ch) => (
-                                <div key={ch.id} className="group/item">
-                                  <div className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest mb-1.5">
-                                    {ch.fieldName}
-                                  </div>
-                                  <div className="flex items-center gap-3 bg-slate-50/80 px-3 py-2 rounded-lg border border-slate-100/50 w-fit">
-                                    <span className="text-[11px] text-slate-400 line-through truncate max-w-[120px]">
-                                      {ch.oldValue || "—"}
-                                    </span>
-                                    <ChevronRight size={10} className="text-slate-300 shrink-0" />
-                                    <span className="text-[11px] font-bold text-emerald-600 truncate max-w-[180px]">
-                                      {ch.newValue || "—"}
-                                    </span>
-                                  </div>
+            <section id="insights" className="scroll-mt-6">
+              <Card className="rounded-[24px] border border-slate-200 bg-white shadow-[0_2px_4px_rgba(0,0,0,0.02)] overflow-hidden">
+                <CardHeader className="border-b border-slate-100 px-8 py-5 bg-[#f8fafc]/30">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-5">
+                    <div>
+                      <CardTitle className="text-[10px] font-semibold text-slate-400 uppercase tracking-[0.2em] leading-none">USAGE METRICS</CardTitle>
+                      <div className="flex items-center gap-2 mt-1">
+                        <div className="h-2 w-2 rounded-full bg-[#14b8a6]" />
+                        <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">ACTIVITY INSIGHTS</span>
+                      </div>
+                    </div>
+                  </div>
+                </CardHeader>
+                <CardContent className="p-8">
+                  <div className="h-[340px] w-full">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <AreaChart data={chartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                        <defs>
+                          <linearGradient id="colorConsent" x1="0" y1="0" x2="0" y2="1">
+                            <stop offset="5%" stopColor="#14b8a6" stopOpacity={0.12} />
+                            <stop offset="95%" stopColor="#14b8a6" stopOpacity={0} />
+                          </linearGradient>
+                          <linearGradient id="colorLogin" x1="0" y1="0" x2="0" y2="1">
+                            <stop offset="5%" stopColor="#2563eb" stopOpacity={0.12} />
+                            <stop offset="95%" stopColor="#2563eb" stopOpacity={0} />
+                          </linearGradient>
+                          <linearGradient id="colorProfile" x1="0" y1="0" x2="0" y2="1">
+                            <stop offset="5%" stopColor="#9333ea" stopOpacity={0.12} />
+                            <stop offset="95%" stopColor="#9333ea" stopOpacity={0} />
+                          </linearGradient>
+                        </defs>
+                        <RechartsCartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                        <XAxis
+                          dataKey="date"
+                          axisLine={false}
+                          tickLine={false}
+                          tick={{ fontSize: 10, fontWeight: 700, fill: '#94a3b8' }}
+                          interval={4}
+                          padding={{ left: 10, right: 10 }}
+                        />
+                        <YAxis hide domain={[0, 'auto']} />
+                        <Legend
+                          verticalAlign="top"
+                          align="right"
+                          iconType="circle"
+                          iconSize={8}
+                          content={({ payload }) => (
+                            <div className="flex items-center justify-end gap-6 mb-8">
+                              {payload?.map((entry: any, index: number) => (
+                                <div key={`item-${index}`} className="flex items-center gap-2">
+                                  <div className="h-2 w-2 rounded-full" style={{ backgroundColor: entry.color }} />
+                                  <span className="text-[11px] font-bold text-slate-400 uppercase tracking-widest">{entry.value}</span>
                                 </div>
                               ))}
                             </div>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </CardContent>
-                </Card>
-              </div>
-              <div className="lg:col-span-3">
-                <Card className="rounded-xl border border-slate-200 bg-white shadow-sm overflow-hidden flex flex-col h-[450px]">
-                  <CardHeader className="border-b border-slate-100 flex flex-row items-center justify-between px-6 py-4 sticky top-0 z-10 bg-white">
-                    <CardTitle className="flex items-center gap-2 text-sm font-semibold">
-                      <History className="h-4 w-4 text-emerald-600" /> Consent Audit
-                    </CardTitle>
-                    <button
-                      onClick={() => navigate({ to: "/history" })}
-                      className="text-[11px] font-bold text-emerald-600 hover:underline uppercase tracking-widest"
-                    >
-                      Logs
-                    </button>
-                  </CardHeader>
-                  <CardContent className="p-0 overflow-y-auto flex-1">
-                    <div className="divide-y divide-slate-100">
-                      {(consent?.history || []).length === 0 && (
-                        <div className="py-20 text-center text-[13px] text-muted-foreground font-medium italic">
-                          No activity recorded.
-                        </div>
-                      )}
-                      {consent?.history?.map((h) => (
-                        <div
-                          key={h.id}
-                          className="flex items-center justify-between p-5 hover:bg-slate-50 transition-colors"
-                        >
-                          <div className="flex items-center gap-4 min-w-0">
-                            <div
-                              className={`grid h-9 w-9 place-items-center rounded-full shrink-0 ${h.action === "ACCEPT" ? "bg-emerald-50 text-emerald-600" : "bg-amber-50 text-amber-600"}`}
-                            >
-                              {h.action === "ACCEPT" ? (
-                                <Check className="h-4 w-4" />
-                              ) : (
-                                <AlertCircle className="h-4 w-4" />
-                              )}
-                            </div>
-                            <div className="min-w-0">
-                              <p className="text-[13px] font-bold text-slate-800 uppercase tracking-tight truncate">
-                                {h.action}
-                              </p>
-                              <p className="text-[11px] text-muted-foreground font-bold mt-0.5 uppercase tracking-tighter truncate opacity-70">
-                                {new Date(h.performed_at).toLocaleDateString(undefined, {
-                                  month: "short",
-                                  day: "numeric",
-                                  year: "numeric",
-                                })}
-                              </p>
-                            </div>
-                          </div>
-                          <span className="text-[10px] font-bold text-slate-400 bg-slate-50 px-2 py-1 rounded-md border border-slate-100 uppercase tracking-widest shrink-0">
-                            Verified
-                          </span>
-                        </div>
-                      ))}
-                    </div>
-                  </CardContent>
-                </Card>
-              </div>
-            </div>
-
-            {/* Row 5: Activity Timeline (Full Width) */}
-            <Card className="rounded-xl border border-slate-200 bg-white shadow-sm overflow-hidden h-[350px]">
-              <CardHeader className="border-b border-slate-100 flex flex-row items-center justify-between px-6 py-4 bg-slate-50/20">
-                <CardTitle className="flex items-center gap-2 text-[11px] font-bold text-muted-foreground uppercase tracking-widest leading-none">
-                  <Activity className="h-4 w-4 text-emerald-600" /> Patient Activity Timeline
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="p-6">
-                <div className="h-[240px] w-full">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <AreaChart
-                      data={chartData}
-                      margin={{ top: 10, right: 10, left: -20, bottom: 0 }}
-                    >
-                      <defs>
-                        <linearGradient id="colorConsent" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="5%" stopColor="#10b981" stopOpacity={0.15} />
-                          <stop offset="95%" stopColor="#10b981" stopOpacity={0} />
-                        </linearGradient>
-                        <linearGradient id="colorLogin" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.15} />
-                          <stop offset="95%" stopColor="#3b82f6" stopOpacity={0} />
-                        </linearGradient>
-                        <linearGradient id="colorProfile" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="5%" stopColor="#a855f7" stopOpacity={0.15} />
-                          <stop offset="95%" stopColor="#a855f7" stopOpacity={0} />
-                        </linearGradient>
-                      </defs>
-                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                      <XAxis
-                        dataKey="date"
-                        axisLine={false}
-                        tickLine={false}
-                        tick={{ fontSize: 10, fontWeight: 600, fill: "#94a3b8" }}
-                        interval={6}
-                      />
-                      <YAxis hide />
-                      <Tooltip
-                        contentStyle={{
-                          borderRadius: "8px",
-                          border: "1px solid #e2e8f0",
-                          boxShadow: "0 4px 6px -1px rgb(0 0 0 / 0.1)",
-                          fontSize: "12px",
-                          fontWeight: "600",
-                        }}
-                      />
-                      <Legend
-                        verticalAlign="top"
-                        align="right"
-                        height={36}
-                        iconType="circle"
-                        iconSize={8}
-                        wrapperStyle={{
-                          fontSize: "10px",
-                          fontWeight: "bold",
-                          textTransform: "uppercase",
-                          letterSpacing: "0.05em",
-                        }}
-                      />
-                      <Area
-                        type="monotone"
-                        dataKey="consentCount"
-                        name="Consent Activity"
-                        stroke="#10b981"
-                        strokeWidth={2.5}
-                        fillOpacity={1}
-                        fill="url(#colorConsent)"
-                        animationDuration={1500}
-                      />
-                      <Area
-                        type="monotone"
-                        dataKey="loginCount"
-                        name="Login Activity"
-                        stroke="#3b82f6"
-                        strokeWidth={2.5}
-                        fillOpacity={1}
-                        fill="url(#colorLogin)"
-                        animationDuration={1500}
-                      />
-                      <Area
-                        type="monotone"
-                        dataKey="profileCount"
-                        name="Profile Update Activity"
-                        stroke="#a855f7"
-                        strokeWidth={2.5}
-                        fillOpacity={1}
-                        fill="url(#colorProfile)"
-                        animationDuration={1500}
-                      />
-                    </AreaChart>
-                  </ResponsiveContainer>
-                </div>
-              </CardContent>
-            </Card>
+                          )}
+                        />
+                        <Tooltip
+                          contentStyle={{
+                            borderRadius: '12px',
+                            border: '1px solid #f1f5f9',
+                            boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)',
+                            fontSize: '12px',
+                            fontWeight: '700'
+                          }}
+                        />
+                        <Area name="CONSENT ACTIVITY" type="monotone" dataKey="consentCount" stroke="#14b8a6" strokeWidth={2.5} fillOpacity={1} fill="url(#colorConsent)" />
+                        <Area name="LOGIN ACTIVITY" type="monotone" dataKey="loginCount" stroke="#2563eb" strokeWidth={2.5} fillOpacity={1} fill="url(#colorLogin)" />
+                        <Area name="PROFILE UPDATE" type="monotone" dataKey="profileCount" stroke="#9333ea" strokeWidth={2.5} fillOpacity={1} fill="url(#colorProfile)" />
+                      </AreaChart>
+                    </ResponsiveContainer>
+                  </div>
+                </CardContent>
+              </Card>
+            </section>
           </div>
         </div>
       </PortalShell>
 
+      {/* Edit Profile Modal (Functionality Preserved) */}
       <Dialog open={isEditModalOpen} onOpenChange={setIsEditModalOpen}>
-        <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto rounded-2xl">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2 text-2xl font-bold">
-              <Edit2 className="h-6 w-6 text-emerald-600" /> Edit Profile
-            </DialogTitle>
-            <p className="text-sm text-muted-foreground">
-              Update your personal and professional information here.
-            </p>
-          </DialogHeader>
+        <DialogContent className="sm:max-w-[640px] max-h-[90vh] overflow-y-auto rounded-3xl p-0 border-none shadow-2xl">
+          <div className="bg-[#f8fafc] px-8 py-6 border-b border-slate-100">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-3 text-2xl font-semibold text-[#1e293b]">
+                <div className="grid h-10 w-10 place-items-center rounded-xl bg-white border border-slate-200 text-[#0d9488] shadow-sm">
+                  <Edit2 className="h-5 w-5" />
+                </div>
+                Edit Profile
+              </DialogTitle>
+              <p className="text-[14px] text-slate-500 font-medium mt-1">Update your personal and professional information here.</p>
+            </DialogHeader>
+          </div>
 
-          <Form {...form}>
-            <form onSubmit={form.handleSubmit(onProfileSubmit)} className="space-y-6 py-4">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <FormField
-                  control={form.control}
-                  name="firstName"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>First Name</FormLabel>
-                      <FormControl>
-                        <Input placeholder="John" {...field} className="rounded-xl h-11" />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="lastName"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Last Name</FormLabel>
-                      <FormControl>
-                        <Input placeholder="Doe" {...field} className="rounded-xl h-11" />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </div>
+          <div className="p-8">
+            <Form {...form}>
+              <form onSubmit={form.handleSubmit(onProfileSubmit)} className="space-y-6 py-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <FormField
+                    control={form.control}
+                    name="firstName"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="text-[11px] font-semibold text-slate-400 uppercase tracking-widest">First Name</FormLabel>
+                        <FormControl>
+                          <Input placeholder="John" {...field} className="rounded-xl h-11 border-slate-100 focus:ring-[#14b8a6] focus:border-[#14b8a6] font-medium" />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="lastName"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="text-[11px] font-semibold text-slate-400 uppercase tracking-widest">Last Name</FormLabel>
+                        <FormControl>
+                          <Input placeholder="Doe" {...field} className="rounded-xl h-11 border-slate-100 focus:ring-[#14b8a6] focus:border-[#14b8a6] font-medium" />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
 
-              <FormField
-                control={form.control}
-                name="email"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Email Address</FormLabel>
-                    <FormControl>
-                      <Input
-                        placeholder="john@example.com"
-                        {...field}
-                        className="rounded-xl h-11"
-                      />
-                    </FormControl>
-                    <FormMessage />
-                    <p className="text-[10px] text-amber-600 flex items-center gap-1 mt-1 font-medium italic">
-                      <AlertCircle size={10} /> Changing email will affect your future logins.
-                    </p>
-                  </FormItem>
-                )}
-              />
+                <FormField
+                  control={form.control}
+                  name="email"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="text-[11px] font-semibold text-slate-400 uppercase tracking-widest">Email Address</FormLabel>
+                      <FormControl>
+                        <Input placeholder="john@example.com" {...field} className="rounded-xl h-11 border-slate-100 focus:ring-[#14b8a6] focus:border-[#14b8a6] font-medium" />
+                      </FormControl>
+                      <FormMessage />
+                      <p className="text-[10px] text-amber-600 flex items-center gap-1 mt-2 font-semibold italic uppercase tracking-tight">
+                        <AlertCircle size={12} /> Changing email will affect your future logins.
+                      </p>
+                    </FormItem>
+                  )}
+                />
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <FormField
-                  control={form.control}
-                  name="mobile"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Mobile Number</FormLabel>
-                      <FormControl>
-                        <CountryPhoneInput {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="age"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Age</FormLabel>
-                      <FormControl>
-                        <Input
-                          type="number"
-                          placeholder="25"
-                          {...field}
-                          className="rounded-xl h-11"
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <FormField
+                    control={form.control}
+                    name="mobile"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="text-[11px] font-bold text-slate-400 uppercase tracking-widest">Mobile Number</FormLabel>
+                        <FormControl>
+                          <CountryPhoneInput {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="age"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="text-[11px] font-bold text-slate-400 uppercase tracking-widest">Age</FormLabel>
+                        <FormControl>
+                          <Input type="number" placeholder="25" {...field} className="rounded-xl h-11 border-slate-100 focus:ring-[#14b8a6] focus:border-[#14b8a6] font-medium" />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <FormField
-                  control={form.control}
-                  name="companyName"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Company Name</FormLabel>
-                      <FormControl>
-                        <Input placeholder="Company Inc." {...field} className="rounded-xl h-11" />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="employeeCode"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Employee Code</FormLabel>
-                      <FormControl>
-                        <Input placeholder="EMP123" {...field} className="rounded-xl h-11" />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <FormField
+                    control={form.control}
+                    name="companyName"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="text-[11px] font-bold text-slate-400 uppercase tracking-widest">Company Name</FormLabel>
+                        <FormControl>
+                          <Input placeholder="Company Inc." {...field} className="rounded-xl h-11 border-slate-100 focus:ring-[#14b8a6] focus:border-[#14b8a6] font-medium" />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="employeeCode"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="text-[11px] font-bold text-slate-400 uppercase tracking-widest">Employee Code</FormLabel>
+                        <FormControl>
+                          <Input placeholder="EMP123" {...field} className="rounded-xl h-11 border-slate-100 focus:ring-[#14b8a6] focus:border-[#14b8a6] font-medium" />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
 
-              <DialogFooter className="pt-6 border-t gap-2">
-                <BrandButton
-                  type="button"
-                  variant="outline"
-                  onClick={() => setIsEditModalOpen(false)}
-                  disabled={updating}
-                  className="rounded-xl"
-                >
-                  Cancel
-                </BrandButton>
-                <BrandButton type="submit" disabled={updating} className="rounded-xl min-w-[120px]">
-                  {updating ? "Saving Changes..." : "Save Changes"}
-                </BrandButton>
-              </DialogFooter>
-            </form>
-          </Form>
+                <DialogFooter className="pt-8 border-t gap-3">
+                  <BrandButton
+                    type="button"
+                    variant="outline"
+                    onClick={() => setIsEditModalOpen(false)}
+                    disabled={updating}
+                    className="rounded-xl h-11 px-8 font-semibold border-slate-100 bg-slate-50 text-slate-500 hover:bg-slate-100"
+                  >
+                    Cancel
+                  </BrandButton>
+                  <BrandButton type="submit" disabled={updating} className="rounded-xl h-11 px-10 font-semibold shadow-brand">
+                    {updating ? "Saving Changes..." : "Save Changes"}
+                  </BrandButton>
+                </DialogFooter>
+              </form>
+            </Form>
+          </div>
         </DialogContent>
       </Dialog>
     </>
