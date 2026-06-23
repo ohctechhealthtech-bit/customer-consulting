@@ -1,7 +1,7 @@
 // Portal (customer-facing) API client
 // All endpoints mounted behind VITE_API_URL (default http://localhost:5000)
 
-const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000";
+const API_URL = import.meta.env.VITE_API_URL || "";
 
 type ApiResponse<T = unknown> = {
   success: boolean;

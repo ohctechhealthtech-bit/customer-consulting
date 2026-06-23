@@ -231,7 +231,7 @@ function PatientDashboard() {
 
   const fetchDashboardData = async (token: string) => {
     try {
-      const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000";
+      const API_URL = import.meta.env.VITE_API_URL || "";
       const res = await fetch(`${API_URL}/api/portal/dashboard`, {
         headers: { Authorization: `Bearer ${token}` },
       });
@@ -257,7 +257,7 @@ function PatientDashboard() {
 
     setWithdrawing(true);
     try {
-      const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000";
+      const API_URL = import.meta.env.VITE_API_URL || "";
       const res = await fetch(`${API_URL}/api/consent`, {
         method: "POST",
         headers: {
@@ -289,7 +289,7 @@ function PatientDashboard() {
 
     setGranting(true);
     try {
-      const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000";
+      const API_URL = import.meta.env.VITE_API_URL || "";
       const res = await fetch(`${API_URL}/api/consent`, {
         method: "POST",
         headers: {

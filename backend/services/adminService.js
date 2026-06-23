@@ -2,6 +2,8 @@ const customerModel = require('../models/customerModel');
 const consentModel = require('../models/consentModel');
 const auditLogModel = require('../models/auditLogModel');
 const { exportToCsv } = require('../utils/csvExport');
+const PDFDocument = require('pdfkit');
+const ExcelJS = require('exceljs');
 
 async function getDashboard() {
   const [stats, dailyRows, deviceDistribution, browserUsage, customers, logins, todayLogins] =
@@ -190,50 +192,182 @@ async function getCustomersWithResponses(query = {}) {
   return { customers, pagination: { limit } };
 }
 
-async function exportCustomersWithResponsesCsv(query = {}) {
-  // Fetch all matching data without a strict pagination limit for exporting.
-  // Using a larger limit like 10000.
+async function exportCustomersWithResponsesExcel(query = {}) {
   const customers = await customerModel.getAllWithResponses({
     search: query.search || query.q,
     limit: 10000,
   });
 
-  if (customers.length === 0) {
-     return exportToCsv([], ['Reference', 'Name', 'Email', 'Mobile', 'Consent', 'Submitted At']);
-  }
+  const workbook = new ExcelJS.Workbook();
+  const worksheet = workbook.addWorksheet('Responses');
 
-  // Find all unique question labels to use as headers
+  const excludeLabels = new Set(['First name', 'Last name', 'Mobile number', 'Email address']);
   const questionHeaders = new Set();
   customers.forEach(c => {
     c.responses.forEach(r => {
-      questionHeaders.add(r.label);
+      if (!excludeLabels.has(r.label)) {
+        questionHeaders.add(r.label);
+      }
     });
   });
 
   const dynamicHeaders = Array.from(questionHeaders);
-  
-  const csvData = customers.map(c => {
-    const row = {
-      'Reference': c.reference || '',
-      'Name': c.name || '',
-      'Email': c.email || '',
-      'Mobile': c.mobile || '',
-      'Consent': c.consent || '',
-      'Submitted At': c.submittedAt ? new Date(c.submittedAt).toLocaleString() : '',
-    };
-    
-    // Fill in dynamic question answers
-    dynamicHeaders.forEach(header => {
-       const response = c.responses.find(r => r.label === header);
-       row[header] = response ? response.value : '';
-    });
-    
-    return row;
+  const headers = ['Reference', 'Name', 'Email', 'Mobile', 'Consent', 'Submitted At', ...dynamicHeaders];
+
+  // Add header row
+  const headerRow = worksheet.addRow(headers);
+  headerRow.eachCell((cell) => {
+    cell.font = { bold: true };
   });
 
-  const fields = ['Reference', 'Name', 'Email', 'Mobile', 'Consent', 'Submitted At', ...dynamicHeaders];
-  
-  return exportToCsv(csvData, fields);
+  customers.forEach(c => {
+    const rowData = [
+      c.reference || '',
+      c.name || '',
+      c.email || '',
+      c.mobile || '',
+      c.consent || '',
+      c.submittedAt ? new Date(c.submittedAt).toLocaleString() : '',
+    ];
+    
+    dynamicHeaders.forEach(header => {
+       const response = c.responses.find(r => r.label === header);
+       rowData.push(response ? response.value : '');
+    });
+    
+    worksheet.addRow(rowData);
+  });
+
+  // Auto-adjust column widths
+  worksheet.columns.forEach((column) => {
+    let maxLength = 0;
+    column.eachCell({ includeEmpty: true }, (cell) => {
+      const columnLength = cell.value ? cell.value.toString().length : 10;
+      if (columnLength > maxLength) {
+        maxLength = columnLength;
+      }
+    });
+    column.width = maxLength < 10 ? 10 : Math.min(maxLength + 2, 50);
+  });
+
+  const buffer = await workbook.xlsx.writeBuffer();
+  return buffer;
+}
+
+async function exportCustomersWithResponsesPdf(query = {}) {
+  const customers = await customerModel.getAllWithResponses({
+    search: query.search || query.q,
+    limit: 10000,
+  });
+
+  return new Promise((resolve, reject) => {
+    try {
+      const doc = new PDFDocument({ margin: 30, size: 'A4', layout: 'landscape', bufferPages: true });
+      const buffers = [];
+      doc.on('data', buffers.push.bind(buffers));
+      doc.on('end', () => resolve(Buffer.concat(buffers)));
+      doc.on('error', reject);
+
+      const excludeLabels = new Set(['First name', 'Last name', 'Mobile number', 'Email address']);
+      const questionHeaders = new Set();
+      customers.forEach(c => {
+        c.responses.forEach(r => {
+          if (!excludeLabels.has(r.label)) questionHeaders.add(r.label);
+        });
+      });
+
+      const dynamicHeaders = Array.from(questionHeaders);
+      const headers = ['Reference', 'Name', 'Email', 'Mobile', 'Consent', 'Submitted', ...dynamicHeaders];
+
+      // Page/margin settings
+      const pageWidth = doc.page.width - 60; // 30px margin each side
+      const colCount = headers.length;
+      const colWidth = Math.floor(pageWidth / colCount);
+      const rowHeight = 20;
+      const headerHeight = 24;
+      const fontSize = 7;
+
+      // Title
+      doc.fontSize(14).font('Helvetica-Bold').text('Responses Report', { align: 'center' });
+      doc.moveDown(0.5);
+
+      let startX = 30;
+      let startY = doc.y;
+
+      // Draw header background
+      doc.rect(startX, startY, pageWidth, headerHeight).fill('#2563EB');
+
+      // Header text
+      doc.fillColor('white').font('Helvetica-Bold').fontSize(fontSize);
+      headers.forEach((h, i) => {
+        doc.text(h, startX + i * colWidth + 3, startY + 7, {
+          width: colWidth - 6,
+          ellipsis: true,
+          lineBreak: false,
+        });
+      });
+      startY += headerHeight;
+
+      // Draw data rows
+      doc.fillColor('black').font('Helvetica').fontSize(fontSize);
+      customers.forEach((c, rowIndex) => {
+        const rowData = [
+          c.reference || '',
+          c.name || '',
+          c.email || '',
+          c.mobile || '',
+          c.consent || '',
+          c.submittedAt ? new Date(c.submittedAt).toLocaleDateString('en-IN') : '',
+          ...dynamicHeaders.map(h => {
+            const r = c.responses.find(r => r.label === h);
+            return r ? String(r.value) : '';
+          }),
+        ];
+
+        // Alternate row background
+        if (rowIndex % 2 === 0) {
+          doc.rect(startX, startY, pageWidth, rowHeight).fill('#F1F5F9');
+        }
+
+        doc.fillColor('black');
+        rowData.forEach((val, i) => {
+          doc.text(String(val), startX + i * colWidth + 3, startY + 6, {
+            width: colWidth - 6,
+            ellipsis: true,
+            lineBreak: false,
+          });
+        });
+
+        // Row border line
+        doc.moveTo(startX, startY + rowHeight).lineTo(startX + pageWidth, startY + rowHeight).stroke('#CBD5E1');
+
+        startY += rowHeight;
+
+        // New page if near bottom
+        if (startY > doc.page.height - 50) {
+          doc.addPage();
+          startY = 30;
+
+          // Redraw header on new page
+          doc.rect(startX, startY, pageWidth, headerHeight).fill('#2563EB');
+          doc.fillColor('white').font('Helvetica-Bold').fontSize(fontSize);
+          headers.forEach((h, i) => {
+            doc.text(h, startX + i * colWidth + 3, startY + 7, {
+              width: colWidth - 6,
+              ellipsis: true,
+              lineBreak: false,
+            });
+          });
+          startY += headerHeight;
+          doc.fillColor('black').font('Helvetica').fontSize(fontSize);
+        }
+      });
+
+      doc.end();
+    } catch (err) {
+      reject(err);
+    }
+  });
 }
 
 async function getCustomerDetail(id) {
@@ -253,6 +387,7 @@ module.exports = {
   getLoginHistory,
   getAuditLogs,
   getCustomersWithResponses,
-  exportCustomersWithResponsesCsv,
+  exportCustomersWithResponsesExcel,
+  exportCustomersWithResponsesPdf,
   getCustomerDetail,
 };

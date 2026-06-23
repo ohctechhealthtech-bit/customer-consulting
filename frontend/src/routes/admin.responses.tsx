@@ -83,7 +83,7 @@ function ResponsesPage() {
       const params = new URLSearchParams();
       if (q) params.set("search", q);
 
-      const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000";
+      const API_URL = import.meta.env.VITE_API_URL || "";
       const res = await fetch(`${API_URL}/api/admin/customers-with-responses/export?${params.toString()}`, {
         headers: { Authorization: `Bearer ${token}` }
       });
@@ -94,7 +94,7 @@ function ResponsesPage() {
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = `responses_export_${new Date().toISOString().split('T')[0]}.csv`;
+      a.download = `responses_export_${new Date().toISOString().split('T')[0]}.xlsx`;
       document.body.appendChild(a);
       a.click();
       window.URL.revokeObjectURL(url);
@@ -103,6 +103,37 @@ function ResponsesPage() {
       toast.success("Export downloaded successfully");
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Export failed");
+    }
+  };
+
+  const handleExportPdf = async () => {
+    try {
+      const token = getAdminToken();
+      if (!token) throw new Error("Admin authentication required");
+
+      const params = new URLSearchParams();
+      if (q) params.set("search", q);
+
+      const API_URL = import.meta.env.VITE_API_URL || "";
+      const res = await fetch(`${API_URL}/api/admin/customers-with-responses/export/pdf?${params.toString()}`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+
+      if (!res.ok) throw new Error("Failed to export PDF data");
+
+      const blob = await res.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `responses_export_${new Date().toISOString().split('T')[0]}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+      
+      toast.success("PDF export downloaded successfully");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "PDF export failed");
     }
   };
 
@@ -120,7 +151,10 @@ function ResponsesPage() {
             />
           </div>
           <Button variant="outline" onClick={handleExport}>
-            <Download className="mr-2 h-4 w-4" /> Export CSV
+            <Download className="mr-2 h-4 w-4" /> Export Excel
+          </Button>
+          <Button variant="outline" onClick={handleExportPdf}>
+            <Download className="mr-2 h-4 w-4" /> Export PDF
           </Button>
         </div>
         {loading ? (

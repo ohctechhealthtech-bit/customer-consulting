@@ -45,7 +45,7 @@ WHERE question_key IN (
 INSERT INTO admin_users (email, password_hash, full_name)
 VALUES (
   'admin@ohctech.com',
-  'ohctech_admin_seed:468837d7f090c2bdd6ce3c29fe4cab6e082769fe1b55866a9bcb30d9876dc693d92637b5be22d1f6b824a788267e8f7e9808e83d235a131a43126c8050df9367',
+  '468837d7f090c2bdd6ce3c29fe4cab6e082769fe1b55866a9bcb30d9876dc693d92637b5be22d1f6b824a788267e8f7e9808e83d235a131a43126c8050df9367',
   'OHCTECH Administrator'
 )
 ON DUPLICATE KEY UPDATE

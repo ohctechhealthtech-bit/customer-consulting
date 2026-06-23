@@ -64,14 +64,25 @@ async function getCustomersWithResponses(req, res) {
   }
 }
 
-async function exportResponsesCsv(req, res) {
+async function exportResponsesExcel(req, res) {
   try {
-    const csvString = await adminService.exportCustomersWithResponsesCsv(req.query);
-    res.setHeader('Content-Type', 'text/csv');
-    res.setHeader('Content-Disposition', 'attachment; filename=responses_export.csv');
-    return res.status(200).send(csvString);
+    const buffer = await adminService.exportCustomersWithResponsesExcel(req.query);
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader('Content-Disposition', 'attachment; filename=responses_export.xlsx');
+    return res.status(200).send(buffer);
   } catch (err) {
-    return error(res, err.message || 'Failed to export CSV', err.statusCode || 500);
+    return error(res, err.message || 'Failed to export Excel', err.statusCode || 500);
+  }
+}
+
+async function exportResponsesPdf(req, res) {
+  try {
+    const pdfBuffer = await adminService.exportCustomersWithResponsesPdf(req.query);
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', 'attachment; filename=responses_export.pdf');
+    return res.status(200).send(pdfBuffer);
+  } catch (err) {
+    return error(res, err.message || 'Failed to export PDF', err.statusCode || 500);
   }
 }
 
@@ -83,5 +94,6 @@ module.exports = {
   getAuditLogs,
   getCustomersWithResponses,
   getCustomerDetail,
-  exportResponsesCsv,
+  exportResponsesExcel,
+  exportResponsesPdf,
 };
